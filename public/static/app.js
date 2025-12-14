@@ -242,9 +242,15 @@ ${importantRemarks.map(r => '* ' + r.content).join('\n')}`
 
 async function fetchOrders() {
   try {
+    // 월별 뷰일 때는 YYYY-MM 형식으로 변환
+    let dateParam = state.currentDate
+    if (state.currentView === 'month' && dateParam && dateParam.length > 7) {
+      dateParam = dateParam.substring(0, 7) // "2025-12-01" -> "2025-12"
+    }
+    
     const params = new URLSearchParams({
       view: state.currentView,
-      date: state.currentDate,
+      date: dateParam,
       type: state.currentOrderType
     })
     
