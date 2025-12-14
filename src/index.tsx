@@ -853,14 +853,36 @@ app.post('/api/import/excel', async (c) => {
       try {
         // 오더 타입 판단
         const typeStr = String(row[0] || '').trim()
+        const containerSize = String(row[7] || '').trim().toUpperCase() // H열: 컨테이너 사이즈
         let orderType = 'bulk'
         
-        if (typeStr.includes('수출')) {
-          orderType = 'container_export'
-        } else if (typeStr.includes('수입')) {
-          orderType = 'container_import'
-        } else if (typeStr.toUpperCase().includes('LCL')) {
+        // 컨테이너 사이즈 기반 타입 판별
+        // HC, HQ, GP, FR → 컨테이너 수출/수입
+        // BK → LCL
+        const isContainerType = /HC|HQ|GP|FR/i.test(containerSize)
+        const isLCLType = /BK/i.test(containerSize)
+        
+        if (isLCLType) {
           orderType = 'lcl'
+        } else if (isContainerType) {
+          // 수출/수입 구분
+          if (typeStr.includes('수출')) {
+            orderType = 'container_export'
+          } else if (typeStr.includes('수입')) {
+            orderType = 'container_import'
+          } else {
+            // 타입 문자열이 명확하지 않으면 기본값으로 수출
+            orderType = 'container_export'
+          }
+        } else {
+          // 기존 로직: 타입 문자열 기반
+          if (typeStr.includes('수출')) {
+            orderType = 'container_export'
+          } else if (typeStr.includes('수입')) {
+            orderType = 'container_import'
+          } else if (typeStr.toUpperCase().includes('LCL')) {
+            orderType = 'lcl'
+          }
         }
         
         // Y열: BKG/BL/NO 추출 (계정명 제거)

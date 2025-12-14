@@ -37,6 +37,9 @@ function parseOrderText(text, orderType) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l)
   const order = { order_type: orderType, remarks: [] }
   
+  // 컨테이너 사이즈 기반 타입 자동 판별을 위한 임시 변수
+  let detectedContainerSize = null
+  
   for (const line of lines) {
     // 컨테이너 수출
     if (line.startsWith('BKG/SIZE') || line.startsWith('BKG / SIZE')) {
@@ -44,6 +47,7 @@ function parseOrderText(text, orderType) {
       if (match) {
         order.booking_number = match[1]?.trim()
         order.container_size = match[2]?.trim()
+        detectedContainerSize = order.container_size
       }
     }
     // 컨테이너 수입
@@ -55,6 +59,7 @@ function parseOrderText(text, orderType) {
       if (match) {
         order.container_number = match[1]?.trim()
         order.container_size = match[2]?.trim()
+        detectedContainerSize = order.container_size
       }
     }
     // 공통
@@ -152,8 +157,26 @@ function parseOrderText(text, orderType) {
     }
   }
   
+  // 컨테이너 사이즈 기반 오더 타입 자동 판별
+  // HC, HQ, GP, FR → 컨테이너 수출/수입
+  // BK → LCL
+  if (detectedContainerSize) {
+    const sizeUpper = detectedContainerSize.toUpperCase()
+    const isContainerType = /HC|HQ|GP|FR/.test(sizeUpper)
+    const isLCLType = /BK/.test(sizeUpper)
+    
+    if (isLCLType) {
+      order.order_type = 'lcl'
+    } else if (isContainerType) {
+      // 수출/수입 구분은 기존 orderType 유지
+      if (orderType === 'container_export' || orderType === 'container_import') {
+        order.order_type = orderType
+      }
+    }
+  }
+  
   // 상태 자동 판단
-  if (orderType === 'container_export') {
+  if (order.order_type === 'container_export') {
     if (!order.dispatch_company) {
       order.status = 'unassigned'
     } else if (!order.container_number || !order.seal_number || !order.vehicle_info) {
@@ -161,7 +184,7 @@ function parseOrderText(text, orderType) {
     } else {
       order.status = 'completed'
     }
-  } else if (orderType === 'container_import' || orderType === 'lcl') {
+  } else if (order.order_type === 'container_import' || order.order_type === 'lcl') {
     if (!order.vehicle_info) {
       order.status = 'undispatched'
     } else {
