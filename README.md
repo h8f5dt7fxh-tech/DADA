@@ -12,8 +12,16 @@
 ## 🌐 접속 URL
 
 - **Production**: https://transport-system-f56.pages.dev
-- **Latest Deploy**: https://f8610456.transport-system-f56.pages.dev
+- **Latest Deploy**: https://f85b2719.transport-system-f56.pages.dev
 - **GitHub**: https://github.com/h8f5dt7fxh-tech/DADA
+
+## 📊 현재 데이터 현황
+
+- **총 오더 수**: 241건
+  - 2025년 11월: 2건
+  - 2025년 12월: 239건
+- **엑셀 파일 강제 등록 완료** (2025-12-14)
+- **기본 뷰**: 월별 (2025-12)
 
 ## ✅ 완료된 기능
 
