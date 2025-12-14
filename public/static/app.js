@@ -3,8 +3,8 @@
 // ============================================
 const state = {
   currentPage: 'orders',
-  currentView: 'day',
-  currentDate: dayjs().format('YYYY-MM-DD'),
+  currentView: 'month',
+  currentDate: '2025-12-01',
   currentOrderType: 'all',
   searchQuery: '',
   orders: [],
