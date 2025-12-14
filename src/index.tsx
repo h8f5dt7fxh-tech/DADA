@@ -65,15 +65,51 @@ app.get('/api/orders', async (c) => {
   const stmt = env.DB.prepare(query).bind(...params)
   const { results } = await stmt.all()
   
-  // 성능 최적화: 모든 오더의 ID를 한 번에 조회
   if (results.length === 0) {
     return c.json([])
   }
   
+  // 성능 최적화: 월별/주별 조회 시에는 상세 정보 생략 (빠른 로딩)
+  // 일별 조회나 검색 시에만 상세 정보 포함
+  const includeDetails = view === 'day' || (search && search.length >= 2)
+  
+  if (!includeDetails) {
+    // 간단한 집계 정보만 추가 (청구/하불 합계)
+    const orderIds = results.map((order: any) => order.id)
+    const idsPlaceholder = orderIds.map(() => '?').join(',')
+    
+    const [billingsRes, paymentsRes] = await Promise.all([
+      env.DB.prepare(`SELECT order_id, SUM(amount) as total FROM billings WHERE order_id IN (${idsPlaceholder}) GROUP BY order_id`)
+        .bind(...orderIds).all(),
+      env.DB.prepare(`SELECT order_id, SUM(amount) as total FROM payments WHERE order_id IN (${idsPlaceholder}) GROUP BY order_id`)
+        .bind(...orderIds).all()
+    ])
+    
+    const billingTotals: any = {}
+    const paymentTotals: any = {}
+    
+    billingsRes.results.forEach((b: any) => {
+      billingTotals[b.order_id] = b.total || 0
+    })
+    
+    paymentsRes.results.forEach((p: any) => {
+      paymentTotals[p.order_id] = p.total || 0
+    })
+    
+    const ordersWithTotals = results.map((order: any) => ({
+      ...order,
+      remarks: [],
+      billings: [{ amount: billingTotals[order.id] || 0 }],
+      payments: [{ amount: paymentTotals[order.id] || 0 }]
+    }))
+    
+    return c.json(ordersWithTotals)
+  }
+  
+  // 일별 조회: 상세 정보 포함
   const orderIds = results.map((order: any) => order.id)
   const idsPlaceholder = orderIds.map(() => '?').join(',')
   
-  // 비고, 청구, 하불 정보를 한 번의 쿼리로 가져오기
   const [remarksRes, billingsRes, paymentsRes] = await Promise.all([
     env.DB.prepare(`SELECT * FROM order_remarks WHERE order_id IN (${idsPlaceholder}) ORDER BY created_at ASC`)
       .bind(...orderIds).all(),
@@ -83,7 +119,6 @@ app.get('/api/orders', async (c) => {
       .bind(...orderIds).all()
   ])
   
-  // order_id로 그룹핑
   const remarksByOrderId: any = {}
   const billingsByOrderId: any = {}
   const paymentsByOrderId: any = {}
@@ -103,7 +138,6 @@ app.get('/api/orders', async (c) => {
     paymentsByOrderId[p.order_id].push(p)
   })
   
-  // 각 오더에 상세 정보 추가
   const ordersWithDetails = results.map((order: any) => ({
     ...order,
     remarks: remarksByOrderId[order.id] || [],

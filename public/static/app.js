@@ -631,10 +631,20 @@ function renderOrderFilters() {
           </button>
         </div>
         
-        <div class="flex space-x-2">
+        <div class="flex space-x-2 items-center">
+          ${state.currentView === 'day' ? `
+            <button onclick="navigateDay(-1)" class="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300" title="이전 날짜">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+          ` : ''}
           <input type="date" id="dateFilter" value="${state.currentDate}" 
                  onchange="changeDate(this.value)" 
                  class="px-3 py-2 border rounded">
+          ${state.currentView === 'day' ? `
+            <button onclick="navigateDay(1)" class="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300" title="다음 날짜">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          ` : ''}
           <button onclick="changeDate(dayjs().format('YYYY-MM-DD'))" class="px-4 py-2 bg-gray-200 rounded">
             오늘
           </button>
@@ -2127,6 +2137,15 @@ function changeToDayView(date) {
 
 function changeDate(date) {
   state.currentDate = date
+  render()
+  fetchOrders()
+}
+
+function navigateDay(direction) {
+  // direction: -1 (이전), 1 (다음)
+  const currentDate = dayjs(state.currentDate)
+  const newDate = currentDate.add(direction, 'day')
+  state.currentDate = newDate.format('YYYY-MM-DD')
   render()
   fetchOrders()
 }
