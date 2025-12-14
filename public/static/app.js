@@ -1315,20 +1315,52 @@ function viewOrderDetail(id) {
       
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <h4 class="font-bold mb-2">청구</h4>
-          <ul>
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="font-bold">청구</h4>
+            <button onclick="showAddBillingModal(${order.id})" class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+              <i class="fas fa-plus mr-1"></i>추가
+            </button>
+          </div>
+          <ul class="space-y-1">
             ${(order.billings || []).map(b => `
-              <li>${b.amount.toLocaleString()}원 ${b.description ? '- ' + b.description : ''}</li>
+              <li class="flex justify-between items-center bg-gray-50 px-2 py-1 rounded">
+                <span>${b.amount.toLocaleString()}원 ${b.description ? '- ' + b.description : ''}</span>
+                <button onclick="deleteBilling(${b.id})" class="text-red-600 hover:text-red-800 text-sm">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </li>
             `).join('') || '<li class="text-gray-500">없음</li>'}
           </ul>
+          <div class="mt-2 text-sm font-semibold">
+            합계: ${(order.billings || []).reduce((sum, b) => sum + b.amount, 0).toLocaleString()}원
+          </div>
         </div>
         <div>
-          <h4 class="font-bold mb-2">하불</h4>
-          <ul>
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="font-bold">하불</h4>
+            <button onclick="showAddPaymentModal(${order.id})" class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+              <i class="fas fa-plus mr-1"></i>추가
+            </button>
+          </div>
+          <ul class="space-y-1">
             ${(order.payments || []).map(p => `
-              <li>${p.amount.toLocaleString()}원 ${p.description ? '- ' + p.description : ''}</li>
+              <li class="flex justify-between items-center bg-gray-50 px-2 py-1 rounded">
+                <span>${p.amount.toLocaleString()}원 ${p.description ? '- ' + p.description : ''}</span>
+                <button onclick="deletePayment(${p.id})" class="text-red-600 hover:text-red-800 text-sm">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </li>
             `).join('') || '<li class="text-gray-500">없음</li>'}
           </ul>
+          <div class="mt-2 text-sm font-semibold">
+            합계: ${(order.payments || []).reduce((sum, p) => sum + p.amount, 0).toLocaleString()}원
+          </div>
+        </div>
+      </div>
+      
+      <div class="mt-4 p-3 bg-blue-50 rounded">
+        <div class="text-lg font-bold text-blue-800">
+          수익: ${((order.billings || []).reduce((sum, b) => sum + b.amount, 0) - (order.payments || []).reduce((sum, p) => sum + p.amount, 0)).toLocaleString()}원
         </div>
       </div>
     </div>
@@ -1371,6 +1403,208 @@ function copyToClipboard(text) {
   }).catch(() => {
     alert('복사에 실패했습니다.')
   })
+}
+
+// ============================================
+// 청구/하불 관리 함수
+// ============================================
+
+function showAddBillingModal(orderId) {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold">청구 추가</h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block mb-1 font-semibold">계정명 (선택):</label>
+          <input type="text" id="billingAccountName" placeholder="예: 본계정, 추가청구1, 삼성전자" 
+                 class="w-full px-3 py-2 border rounded focus:border-blue-500">
+          <p class="text-xs text-gray-500 mt-1">* 엑셀 다운로드 시 BKG/BL 앞에 표시됩니다</p>
+        </div>
+        
+        <div>
+          <label class="block mb-1 font-semibold">금액 (필수):</label>
+          <input type="number" id="billingAmount" placeholder="500000" 
+                 class="w-full px-3 py-2 border rounded focus:border-blue-500">
+        </div>
+        
+        <div class="flex space-x-2">
+          <button onclick="submitBilling(${orderId})" 
+                  class="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            <i class="fas fa-save mr-1"></i>저장
+          </button>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+            취소
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+function showAddPaymentModal(orderId) {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold">하불 추가</h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block mb-1 font-semibold">계정명 (선택):</label>
+          <input type="text" id="paymentAccountName" placeholder="예: 업체A, 업체B, 로지아이솔루션" 
+                 class="w-full px-3 py-2 border rounded focus:border-green-500">
+          <p class="text-xs text-gray-500 mt-1">* 엑셀 다운로드 시 BKG/BL 앞에 표시됩니다</p>
+        </div>
+        
+        <div>
+          <label class="block mb-1 font-semibold">금액 (필수):</label>
+          <input type="number" id="paymentAmount" placeholder="400000" 
+                 class="w-full px-3 py-2 border rounded focus:border-green-500">
+        </div>
+        
+        <div class="flex space-x-2">
+          <button onclick="submitPayment(${orderId})" 
+                  class="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            <i class="fas fa-save mr-1"></i>저장
+          </button>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+            취소
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+async function submitBilling(orderId) {
+  const accountName = document.getElementById('billingAccountName').value.trim()
+  const amount = parseFloat(document.getElementById('billingAmount').value)
+  
+  if (!amount || amount <= 0) {
+    alert('금액을 입력해주세요.')
+    return
+  }
+  
+  try {
+    await axios.post(`/api/orders/${orderId}/billings`, {
+      amount: amount,
+      description: accountName
+    })
+    
+    // 모달 닫기
+    document.querySelector('.fixed').remove()
+    
+    // 오더 목록 새로고침
+    await fetchOrders()
+    
+    // 상세 모달 다시 열기
+    viewOrderDetail(orderId)
+    
+    alert('청구가 추가되었습니다.')
+  } catch (error) {
+    console.error('청구 추가 실패:', error)
+    alert('청구 추가에 실패했습니다.')
+  }
+}
+
+async function submitPayment(orderId) {
+  const accountName = document.getElementById('paymentAccountName').value.trim()
+  const amount = parseFloat(document.getElementById('paymentAmount').value)
+  
+  if (!amount || amount <= 0) {
+    alert('금액을 입력해주세요.')
+    return
+  }
+  
+  try {
+    await axios.post(`/api/orders/${orderId}/payments`, {
+      amount: amount,
+      description: accountName
+    })
+    
+    // 모달 닫기
+    document.querySelector('.fixed').remove()
+    
+    // 오더 목록 새로고침
+    await fetchOrders()
+    
+    // 상세 모달 다시 열기
+    viewOrderDetail(orderId)
+    
+    alert('하불이 추가되었습니다.')
+  } catch (error) {
+    console.error('하불 추가 실패:', error)
+    alert('하불 추가에 실패했습니다.')
+  }
+}
+
+async function deleteBilling(billingId) {
+  if (!confirm('이 청구를 삭제하시겠습니까?')) return
+  
+  try {
+    await axios.delete(`/api/billings/${billingId}`)
+    
+    // 오더 목록 새로고침
+    await fetchOrders()
+    
+    // 상세 모달 닫고 다시 열기
+    const orderId = state.selectedOrder.id
+    document.querySelector('.fixed').remove()
+    viewOrderDetail(orderId)
+    
+    alert('청구가 삭제되었습니다.')
+  } catch (error) {
+    console.error('청구 삭제 실패:', error)
+    alert('청구 삭제에 실패했습니다.')
+  }
+}
+
+async function deletePayment(paymentId) {
+  if (!confirm('이 하불을 삭제하시겠습니까?')) return
+  
+  try {
+    await axios.delete(`/api/payments/${paymentId}`)
+    
+    // 오더 목록 새로고침
+    await fetchOrders()
+    
+    // 상세 모달 닫고 다시 열기
+    const orderId = state.selectedOrder.id
+    document.querySelector('.fixed').remove()
+    viewOrderDetail(orderId)
+    
+    alert('하불이 삭제되었습니다.')
+  } catch (error) {
+    console.error('하불 삭제 실패:', error)
+    alert('하불 삭제에 실패했습니다.')
+  }
 }
 
 function addTodo() {
