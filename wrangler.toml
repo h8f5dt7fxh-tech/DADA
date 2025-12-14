@@ -1,8 +1,7 @@
 name = "transport-system"
-main = "src/index.tsx"
 compatibility_date = "2024-01-01"
+pages_build_output_dir = "./dist"
 compatibility_flags = ["nodejs_compat"]
-account_id = "fa896c5c64c82d58a1ff67933ff83c4a"
 
 [[d1_databases]]
 binding = "DB"
