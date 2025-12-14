@@ -605,15 +605,14 @@ app.get('/api/export/excel', async (c) => {
       .bind(order.id).all()
     const remarkText = remarks.results.map((r: any) => r.content).join(' / ')
     
-    // 청구/하불 조회
-    const billings = await env.DB.prepare('SELECT SUM(amount) as total FROM billings WHERE order_id = ?')
-      .bind(order.id).first()
-    const payments = await env.DB.prepare('SELECT SUM(amount) as total FROM payments WHERE order_id = ?')
-      .bind(order.id).first()
+    // 청구/하불 조회 (개별 항목)
+    const billingsResult = await env.DB.prepare('SELECT * FROM billings WHERE order_id = ? ORDER BY id')
+      .bind(order.id).all()
+    const paymentsResult = await env.DB.prepare('SELECT * FROM payments WHERE order_id = ? ORDER BY id')
+      .bind(order.id).all()
     
-    const totalBilling = (billings as any)?.total || 0
-    const totalPayment = (payments as any)?.total || 0
-    const profit = totalBilling - totalPayment
+    const billings = billingsResult.results as any[]
+    const payments = paymentsResult.results as any[]
     
     // 타입 표시
     let typeLabel = ''
@@ -627,46 +626,73 @@ app.get('/api/export/excel', async (c) => {
       typeLabel = '벌크'
     }
     
-    // BKG/BL/NO
-    let bkgBlNo = ''
+    // BKG/BL/NO 기본값
+    let baseBkgBlNo = ''
     if (order.order_type === 'container_export') {
-      bkgBlNo = order.booking_number || ''
+      baseBkgBlNo = order.booking_number || ''
     } else if (order.order_type === 'container_import') {
-      bkgBlNo = order.bl_number || ''
+      baseBkgBlNo = order.bl_number || ''
     } else {
-      bkgBlNo = order.order_no || ''
+      baseBkgBlNo = order.order_no || ''
     }
     
-    rows.push([
-      typeLabel,                              // A
-      '',                                     // B
-      order.work_datetime || '',              // C
-      order.billing_company || '',            // D
-      order.shipper || '',                    // E
-      order.work_site_code || '',             // F
-      order.work_site || '',                  // G
-      order.container_size || '',             // H
-      order.order_type === 'lcl' ? '' : (order.loading_location || ''),  // I
-      order.order_type === 'lcl' ? '' : (order.loading_location_code || ''),  // J
-      order.order_type === 'lcl' ? '' : (order.unloading_location || ''),  // K
-      order.order_type === 'lcl' ? '' : (order.unloading_location_code || ''),  // L
-      order.order_type === 'lcl' ? 'XXXX' : (order.shipping_line || ''),  // M
-      order.shipping_line_code || '',         // N
-      (order.order_type === 'container_import' || order.order_type === 'lcl') ? '-' : (order.vessel_name || ''),  // O
-      (order.order_type === 'container_import' || order.order_type === 'lcl') ? '-' : (order.berth_date || ''),  // P
-      order.order_type === 'lcl' ? (order.vehicle_info || '') : (order.container_number || ''),  // Q
-      (order.order_type === 'container_import' || order.order_type === 'lcl') ? '-' : (order.seal_number || ''),  // R
-      order.dispatch_company || '',           // S
-      order.vehicle_info || '',               // T
-      order.dispatch_company || '',           // U (중복)
-      String(totalBilling),                   // V
-      String(totalPayment),                   // W
-      String(profit),                         // X
-      bkgBlNo,                                // Y
-      order.contact_person || '',             // Z
-      '',                                     // AA
-      remarkText                              // AB
-    ])
+    // 청구/하불 중 더 많은 쪽의 개수만큼 행 생성
+    const maxRows = Math.max(billings.length, payments.length, 1)
+    
+    for (let i = 0; i < maxRows; i++) {
+      const billing = billings[i]
+      const payment = payments[i]
+      
+      // 청구/하불 금액
+      const billingAmount = billing ? String(billing.amount) : ''
+      const paymentAmount = payment ? String(payment.amount) : ''
+      const profit = (billing?.amount || 0) - (payment?.amount || 0)
+      
+      // BKG/BL/NO에 계정명 추가 (2건 이상일 때만)
+      let bkgBlNo = baseBkgBlNo
+      if (maxRows > 1) {
+        const accountName = billing?.description || payment?.description || `계정${i + 1}`
+        bkgBlNo = accountName ? `${accountName}_${baseBkgBlNo}` : baseBkgBlNo
+      }
+      
+      // 컨테이너 넘버에도 계정명 추가 (2건 이상일 때)
+      let containerNumber = order.container_number || ''
+      if (maxRows > 1 && containerNumber) {
+        const accountName = billing?.description || payment?.description || `계정${i + 1}`
+        containerNumber = accountName ? `${accountName}_${containerNumber}` : containerNumber
+      }
+      
+      rows.push([
+        typeLabel,                              // A
+        '',                                     // B
+        order.work_datetime || '',              // C
+        order.billing_company || '',            // D
+        order.shipper || '',                    // E
+        order.work_site_code || '',             // F
+        order.work_site || '',                  // G
+        order.container_size || '',             // H
+        order.order_type === 'lcl' ? '' : (order.loading_location || ''),  // I
+        order.order_type === 'lcl' ? '' : (order.loading_location_code || ''),  // J
+        order.order_type === 'lcl' ? '' : (order.unloading_location || ''),  // K
+        order.order_type === 'lcl' ? '' : (order.unloading_location_code || ''),  // L
+        order.order_type === 'lcl' ? 'XXXX' : (order.shipping_line || ''),  // M
+        order.shipping_line_code || '',         // N
+        (order.order_type === 'container_import' || order.order_type === 'lcl') ? '-' : (order.vessel_name || ''),  // O
+        (order.order_type === 'container_import' || order.order_type === 'lcl') ? '-' : (order.berth_date || ''),  // P
+        order.order_type === 'lcl' ? (order.vehicle_info || '') : containerNumber,  // Q (컨테이너 넘버에 계정명)
+        (order.order_type === 'container_import' || order.order_type === 'lcl') ? '-' : (order.seal_number || ''),  // R
+        order.dispatch_company || '',           // S
+        order.vehicle_info || '',               // T
+        order.dispatch_company || '',           // U (중복)
+        billingAmount,                          // V (개별 청구금액)
+        paymentAmount,                          // W (개별 하불금액)
+        profit ? String(profit) : '',           // X (개별 수익)
+        bkgBlNo,                                // Y (BKG/BL/NO에 계정명)
+        order.contact_person || '',             // Z
+        '',                                     // AA
+        remarkText                              // AB
+      ])
+    }
   }
   
   // CSV 생성

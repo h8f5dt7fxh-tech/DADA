@@ -1,0 +1,10 @@
+name = "transport-system"
+main = "src/index.tsx"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "fa896c5c64c82d58a1ff67933ff83c4a"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "webapp-production"
+database_id = "88a3cc9a-4505-48de-aeb7-ffb07fa3ae46"
