@@ -306,8 +306,11 @@ async function deleteOrder(id) {
   }
 }
 
-function editOrder(id) {
-  const order = state.orders.find(o => o.id === id)
+async function editOrder(id) {
+  // 오더 상세 정보 가져오기 (비고 포함)
+  const response = await axios.get(`/api/orders/${id}`)
+  const order = response.data
+  
   if (!order) {
     alert('오더를 찾을 수 없습니다.')
     return
@@ -315,6 +318,18 @@ function editOrder(id) {
   
   // 모든 모달 닫기
   document.querySelectorAll('.fixed').forEach(modal => modal.remove())
+  
+  // 비고 HTML 생성
+  const remarksHtml = order.remarks && order.remarks.length > 0 
+    ? order.remarks.map(r => `
+        <div class="flex items-center justify-between p-2 bg-gray-50 rounded mb-2">
+          <span class="text-sm">${r.content}</span>
+          <button type="button" onclick="deleteRemark(${r.id}, ${id})" class="text-red-500 hover:text-red-700">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `).join('')
+    : '<p class="text-sm text-gray-400">비고가 없습니다.</p>'
   
   // 수정 모달 생성
   const modal = document.createElement('div')
@@ -381,6 +396,19 @@ function editOrder(id) {
           <div>
             <label class="block text-sm font-medium mb-1">연락처</label>
             <input type="text" name="contact_phone" value="${order.contact_phone || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+        </div>
+        
+        <!-- 비고 섹션 -->
+        <div class="border-t pt-4 mt-4">
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-sm font-medium">비고</label>
+            <button type="button" onclick="addRemarkInEdit(${id})" class="text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+              <i class="fas fa-plus mr-1"></i>추가
+            </button>
+          </div>
+          <div id="remarksList" class="space-y-2">
+            ${remarksHtml}
           </div>
         </div>
         
@@ -1911,6 +1939,42 @@ function render() {
     fetchTodos()
   } else if (state.currentPage === 'codes') {
     // 코드 데이터는 이미 로드됨 (무한 루프 방지 - render() 호출 제거)
+  }
+}
+
+// ============================================
+// 비고 관리 함수
+// ============================================
+
+async function addRemarkInEdit(orderId) {
+  const content = prompt('비고 내용을 입력하세요:')
+  if (!content || content.trim() === '') return
+  
+  try {
+    await axios.post(`/api/orders/${orderId}/remarks`, { 
+      content: content.trim(),
+      importance: 1 
+    })
+    // 모달 닫고 다시 열기
+    document.querySelector('.fixed').remove()
+    editOrder(orderId)
+  } catch (error) {
+    console.error('비고 추가 실패:', error)
+    alert('비고 추가에 실패했습니다.')
+  }
+}
+
+async function deleteRemark(remarkId, orderId) {
+  if (!confirm('이 비고를 삭제하시겠습니까?')) return
+  
+  try {
+    await axios.delete(`/api/remarks/${remarkId}`)
+    // 모달 닫고 다시 열기
+    document.querySelector('.fixed').remove()
+    editOrder(orderId)
+  } catch (error) {
+    console.error('비고 삭제 실패:', error)
+    alert('비고 삭제에 실패했습니다.')
   }
 }
 
