@@ -28,6 +28,10 @@ function formatDate(date) {
   return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 
+function formatTime(date) {
+  return dayjs(date).format('HH:mm')
+}
+
 function parseOrderText(text, orderType) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l)
   const order = { order_type: orderType, remarks: [] }
@@ -452,7 +456,89 @@ function renderOrderFilters() {
   `
 }
 
+function renderOrderCard(order) {
+  const typeLabel = {
+    'container_export': '수출',
+    'container_import': '수입',
+    'bulk': '벌크',
+    'lcl': 'LCL'
+  }[order.order_type]
+  
+  const typeColor = {
+    'container_export': 'bg-green-100 text-green-800 border-green-300',
+    'container_import': 'bg-blue-100 text-blue-800 border-blue-300',
+    'bulk': 'bg-gray-100 text-gray-800 border-gray-300',
+    'lcl': 'bg-yellow-100 text-yellow-800 border-yellow-300'
+  }[order.order_type]
+  
+  const totalBilling = (order.billings || []).reduce((sum, b) => sum + parseFloat(b.amount || 0), 0)
+  const totalPayment = (order.payments || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
+  
+  return `
+    <div class="border-l-4 ${typeColor} bg-white p-3 rounded shadow-sm mb-2 cursor-pointer hover:shadow-md transition" 
+         onclick="viewOrderDetail(${order.id})">
+      <div class="flex items-start justify-between mb-2">
+        <span class="px-2 py-1 text-xs font-semibold rounded ${typeColor}">
+          ${typeLabel}
+        </span>
+        <span class="text-xs text-gray-500">${formatTime(order.work_datetime)}</span>
+      </div>
+      <div class="text-sm font-bold mb-1">${order.booking_number || order.bl_number || order.order_no || '-'}</div>
+      <div class="text-xs text-gray-600 mb-1">
+        <i class="fas fa-building mr-1"></i>${order.billing_company}
+      </div>
+      <div class="text-xs text-gray-600 mb-1">
+        <i class="fas fa-user mr-1"></i>${order.shipper}
+      </div>
+      ${order.dispatch_company ? `<div class="text-xs text-gray-600 mb-1"><i class="fas fa-truck mr-1"></i>${order.dispatch_company}</div>` : ''}
+      ${order.vehicle_info ? `<div class="text-xs text-gray-500"><i class="fas fa-car mr-1"></i>${order.vehicle_info}</div>` : ''}
+    </div>
+  `
+}
+
 function renderOrderList() {
+  const listContainer = document.getElementById('orderListContainer')
+  if (!listContainer) return
+  
+  // 월별/주별 뷰: 카드 형식
+  if (state.currentView === 'month' || state.currentView === 'week') {
+    // 날짜별로 그룹핑
+    const ordersByDate = {}
+    state.orders.forEach(order => {
+      const date = order.work_datetime.split(' ')[0]
+      if (!ordersByDate[date]) {
+        ordersByDate[date] = []
+      }
+      ordersByDate[date].push(order)
+    })
+    
+    const dates = Object.keys(ordersByDate).sort()
+    const daysHtml = dates.map(date => {
+      const orders = ordersByDate[date]
+      const dayName = dayjs(date).format('ddd')
+      const dayNum = dayjs(date).format('D')
+      
+      return `
+        <div class="border rounded-lg bg-gray-50 p-2">
+          <div class="font-bold mb-2 text-sm border-b pb-1">
+            ${dayjs(date).format('M월 D일')} (${dayName}) <span class="text-xs text-gray-500">${orders.length}건</span>
+          </div>
+          <div class="space-y-1 max-h-96 overflow-y-auto">
+            ${orders.map(order => renderOrderCard(order)).join('')}
+          </div>
+        </div>
+      `
+    }).join('')
+    
+    listContainer.innerHTML = `
+      <div class="grid ${state.currentView === 'week' ? 'grid-cols-7' : 'grid-cols-4'} gap-2">
+        ${daysHtml || '<div class="col-span-full text-center text-gray-500 py-8">오더가 없습니다</div>'}
+      </div>
+    `
+    return
+  }
+  
+  // 일별 뷰: 테이블 형식
   const ordersHtml = state.orders.map(order => {
     const statusClass = `status-${order.status}`
     const typeLabel = {
@@ -489,34 +575,31 @@ function renderOrderList() {
     `
   }).join('')
   
-  const listContainer = document.getElementById('orderListContainer')
-  if (listContainer) {
-    listContainer.innerHTML = `
-      <div class="bg-white rounded-lg shadow overflow-hidden">
-        <table class="w-full">
-          <thead class="bg-gray-100">
-            <tr>
-              <th class="px-4 py-3 text-left">구분</th>
-              <th class="px-4 py-3 text-left">작업일시</th>
-              <th class="px-4 py-3 text-left">청구처</th>
-              <th class="px-4 py-3 text-left">화주</th>
-              <th class="px-4 py-3 text-left">작업지</th>
-              <th class="px-4 py-3 text-left">BKG/BL/NO</th>
-              <th class="px-4 py-3 text-left">상하차지</th>
-              <th class="px-4 py-3 text-left">배차업체</th>
-              <th class="px-4 py-3 text-right">청구</th>
-              <th class="px-4 py-3 text-right">하불</th>
-              <th class="px-4 py-3 text-right">수익</th>
-              <th class="px-4 py-3 text-center">상태</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${ordersHtml || '<tr><td colspan="12" class="px-4 py-8 text-center text-gray-500">오더가 없습니다</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-    `
-  }
+  listContainer.innerHTML = `
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="px-4 py-3 text-left">구분</th>
+            <th class="px-4 py-3 text-left">작업일시</th>
+            <th class="px-4 py-3 text-left">청구처</th>
+            <th class="px-4 py-3 text-left">화주</th>
+            <th class="px-4 py-3 text-left">작업지</th>
+            <th class="px-4 py-3 text-left">BKG/BL/NO</th>
+            <th class="px-4 py-3 text-left">상하차지</th>
+            <th class="px-4 py-3 text-left">배차업체</th>
+            <th class="px-4 py-3 text-right">청구</th>
+            <th class="px-4 py-3 text-right">하불</th>
+            <th class="px-4 py-3 text-right">수익</th>
+            <th class="px-4 py-3 text-center">상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ordersHtml || '<tr><td colspan="12" class="px-4 py-8 text-center text-gray-500">오더가 없습니다</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `
 }
 
 function renderCreateOrderPage() {
