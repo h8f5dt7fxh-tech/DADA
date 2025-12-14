@@ -1361,6 +1361,52 @@ app.get('/', (c) => {
           .status-unassigned { background-color: #fed7aa; }
           .status-undispatched { background-color: #fecaca; }
           .status-completed { background-color: #d1fae5; }
+          
+          /* 모바일 반응형 스타일 */
+          @media (max-width: 768px) {
+            .desktop-nav { display: none; }
+            .mobile-nav { display: flex !important; }
+            .filter-group { flex-direction: column; gap: 0.5rem; }
+            .button-group { flex-wrap: wrap; }
+            .date-nav { font-size: 0.875rem; }
+            .date-nav button { padding: 0.5rem 0.75rem; }
+            .order-card { font-size: 0.875rem; }
+            .table-container { overflow-x: auto; }
+          }
+          
+          @media (min-width: 769px) {
+            .mobile-nav { display: none !important; }
+            .desktop-nav { display: flex; }
+          }
+          
+          /* 햄버거 메뉴 애니메이션 */
+          .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+            display: none;
+          }
+          
+          .menu-overlay.active { display: block; }
+          
+          .mobile-menu {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 80%;
+            max-width: 300px;
+            height: 100%;
+            background: white;
+            z-index: 50;
+            transition: right 0.3s ease;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+          }
+          
+          .mobile-menu.active { right: 0; }
         </style>
     </head>
     <body class="bg-gray-50">

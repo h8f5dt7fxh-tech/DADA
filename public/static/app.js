@@ -587,7 +587,8 @@ function renderNavigation() {
     <nav class="bg-white shadow-sm border-b">
       <div class="max-w-7xl mx-auto px-4">
         <div class="flex items-center justify-between h-16">
-          <div class="flex items-center space-x-8">
+          <!-- 데스크톱 네비게이션 -->
+          <div class="flex items-center space-x-8 desktop-nav w-full">
             <h1 class="text-xl font-bold text-gray-800">
               <i class="fas fa-truck mr-2"></i>운송사 관리 시스템
             </h1>
@@ -609,39 +610,79 @@ function renderNavigation() {
               </button>
             </div>
           </div>
+          
+          <!-- 모바일 네비게이션 -->
+          <div class="mobile-nav flex items-center justify-between w-full" style="display: none;">
+            <h1 class="text-lg font-bold text-gray-800">
+              <i class="fas fa-truck mr-2"></i>운송 관리
+            </h1>
+            <button onclick="toggleMobileMenu()" class="p-2 text-gray-600 hover:text-gray-900">
+              <i class="fas fa-bars text-2xl"></i>
+            </button>
+          </div>
         </div>
       </div>
     </nav>
+    
+    <!-- 모바일 메뉴 오버레이 -->
+    <div id="menuOverlay" class="menu-overlay" onclick="toggleMobileMenu()"></div>
+    
+    <!-- 모바일 사이드 메뉴 -->
+    <div id="mobileMenu" class="mobile-menu">
+      <div class="p-4 border-b flex items-center justify-between">
+        <h2 class="text-lg font-bold text-gray-800">메뉴</h2>
+        <button onclick="toggleMobileMenu()" class="p-2 text-gray-600 hover:text-gray-900">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+      <div class="p-4">
+        <button onclick="changePage('orders'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'orders' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+          <i class="fas fa-list mr-2"></i>오더 관리
+        </button>
+        <button onclick="changePage('create-order'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'create-order' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+          <i class="fas fa-plus mr-2"></i>오더 입력
+        </button>
+        <button onclick="changePage('clients'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'clients' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+          <i class="fas fa-building mr-2"></i>거래처 관리
+        </button>
+        <button onclick="changePage('codes'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'codes' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+          <i class="fas fa-code mr-2"></i>코드 관리
+        </button>
+        <button onclick="changePage('todos'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'todos' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+          <i class="fas fa-tasks mr-2"></i>할일
+        </button>
+      </div>
+    </div>
   `
 }
 
 function renderOrderFilters() {
   return `
-    <div class="bg-white p-4 rounded-lg shadow mb-4">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex space-x-2">
-          <button onclick="changeView('month')" class="px-4 py-2 rounded ${state.currentView === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
+    <div class="bg-white p-3 md:p-4 rounded-lg shadow mb-4">
+      <div class="filter-group flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-0 mb-4">
+        <div class="button-group flex space-x-2">
+          <button onclick="changeView('month')" class="flex-1 md:flex-none px-3 md:px-4 py-2 rounded text-sm md:text-base ${state.currentView === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
             월별
           </button>
-          <button onclick="changeView('week')" class="px-4 py-2 rounded ${state.currentView === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
+          <button onclick="changeView('week')" class="flex-1 md:flex-none px-3 md:px-4 py-2 rounded text-sm md:text-base ${state.currentView === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
             주별
           </button>
-          <button onclick="changeView('day')" class="px-4 py-2 rounded ${state.currentView === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
+          <button onclick="changeView('day')" class="flex-1 md:flex-none px-3 md:px-4 py-2 rounded text-sm md:text-base ${state.currentView === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
             일별
           </button>
         </div>
         
-        <div class="flex space-x-2 items-center">
-          <button onclick="navigatePeriod(-1)" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-lg" title="이전 ${state.currentView === 'month' ? '월' : state.currentView === 'week' ? '주' : '날짜'}">
+        <div class="date-nav flex space-x-2 items-center justify-between md:justify-start">
+          <button onclick="navigatePeriod(-1)" class="px-3 md:px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-base md:text-lg" title="이전 ${state.currentView === 'month' ? '월' : state.currentView === 'week' ? '주' : '날짜'}">
             <i class="fas fa-chevron-left"></i>
           </button>
           <input type="date" id="dateFilter" value="${state.currentDate}" 
                  onchange="changeDate(this.value)" 
-                 class="px-3 py-2 border rounded">
-          <button onclick="navigatePeriod(1)" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-lg" title="다음 ${state.currentView === 'month' ? '월' : state.currentView === 'week' ? '주' : '날짜'}">
+                 class="px-2 md:px-3 py-2 border rounded text-sm md:text-base flex-1 md:flex-none">
+          <button onclick="navigatePeriod(1)" class="px-3 md:px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-base md:text-lg" title="다음 ${state.currentView === 'month' ? '월' : state.currentView === 'week' ? '주' : '날짜'}">
             <i class="fas fa-chevron-right"></i>
           </button>
-          <button onclick="changeDate(dayjs().format('YYYY-MM-DD'))" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+          <button onclick="changeDate(dayjs().format('YYYY-MM-DD'))" class="px-3 md:px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm md:text-base whitespace-nowrap">
             오늘
           </button>
         </div>
@@ -2159,6 +2200,16 @@ function navigatePeriod(direction) {
 // 이전 함수명 호환성 유지
 function navigateDay(direction) {
   navigatePeriod(direction)
+}
+
+function toggleMobileMenu() {
+  const overlay = document.getElementById('menuOverlay')
+  const menu = document.getElementById('mobileMenu')
+  
+  if (overlay && menu) {
+    overlay.classList.toggle('active')
+    menu.classList.toggle('active')
+  }
 }
 
 function changeOrderType(type) {
