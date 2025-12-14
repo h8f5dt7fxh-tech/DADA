@@ -12,7 +12,7 @@
 ## 🌐 접속 URL
 
 - **Production**: https://transport-system-f56.pages.dev
-- **Latest Deploy**: https://18865e7c.transport-system-f56.pages.dev
+- **Latest Deploy**: https://f8610456.transport-system-f56.pages.dev
 - **GitHub**: https://github.com/h8f5dt7fxh-tech/DADA
 
 ## ✅ 완료된 기능
@@ -80,8 +80,19 @@
   - 금액 필드 (필수)
 - ✅ 청구/하불 개별 삭제
 - ✅ 합계 및 수익 자동 계산
+- ✅ **계정명 템플릿 관리 (API 구현 완료)**
+  - 자주 사용하는 계정명 미리 등록
+  - 사용 횟수 추적
+  - 유형별 분류 (청구/하불/공통)
 
-### 9. 할일 메모
+### 9. 엑셀 업로드 고급 기능 (NEW!)
+- ✅ **다중건 자동 인식 및 그룹핑**
+  - 같은 BKG/BL 번호가 여러 행에 있으면 자동으로 하나의 오더로 통합
+  - 각 행의 청구/하불 금액을 개별 항목으로 분리 저장
+  - 계정명 자동 추출 (`계정명_BKG123` 형식)
+  - 작업일 + BKG/BL + 화주 기준으로 그룹핑
+
+### 10. 할일 메모
 - ✅ 간단한 할일 추가/삭제
 - ✅ 완료 체크
 - ✅ 메모 관리
