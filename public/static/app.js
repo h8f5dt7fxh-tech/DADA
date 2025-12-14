@@ -587,14 +587,14 @@ function renderOrderFilters() {
     <div class="bg-white p-4 rounded-lg shadow mb-4">
       <div class="flex items-center justify-between mb-4">
         <div class="flex space-x-2">
-          <button onclick="changeView('day')" class="px-4 py-2 rounded ${state.currentView === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
-            일별
+          <button onclick="changeView('month')" class="px-4 py-2 rounded ${state.currentView === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
+            월별
           </button>
           <button onclick="changeView('week')" class="px-4 py-2 rounded ${state.currentView === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
             주별
           </button>
-          <button onclick="changeView('month')" class="px-4 py-2 rounded ${state.currentView === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
-            월별
+          <button onclick="changeView('day')" class="px-4 py-2 rounded ${state.currentView === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
+            일별
           </button>
         </div>
         
@@ -695,8 +695,10 @@ function renderOrderList() {
       
       return `
         <div class="border rounded-lg bg-gray-50 p-2">
-          <div class="font-bold mb-2 text-sm border-b pb-1">
+          <div class="font-bold mb-2 text-sm border-b pb-1 cursor-pointer hover:bg-gray-200 px-2 py-1 rounded transition" 
+               onclick="changeToDayView('${date}')">
             ${dayjs(date).format('M월 D일')} (${dayName}) <span class="text-xs text-gray-500">${orders.length}건</span>
+            <i class="fas fa-search text-xs ml-1 text-blue-500"></i>
           </div>
           <div class="space-y-1 max-h-96 overflow-y-auto">
             ${orders.map(order => renderOrderCard(order)).join('')}
@@ -1492,6 +1494,13 @@ function renderExcelInputMode() {
 
 function changeView(view) {
   state.currentView = view
+  render()
+  fetchOrders()
+}
+
+function changeToDayView(date) {
+  state.currentView = 'day'
+  state.currentDate = date
   render()
   fetchOrders()
 }
