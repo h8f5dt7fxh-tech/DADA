@@ -1672,8 +1672,7 @@ function render() {
   } else if (state.currentPage === 'todos') {
     fetchTodos()
   } else if (state.currentPage === 'codes') {
-    // 코드 데이터는 이미 로드됨
-    render()
+    // 코드 데이터는 이미 로드됨 (무한 루프 방지 - render() 호출 제거)
   }
 }
 
