@@ -553,6 +553,81 @@ app.delete('/api/todos/:id', async (c) => {
 })
 
 // ============================================
+// API Routes - 계정명 템플릿 관리
+// ============================================
+
+// 계정명 템플릿 목록 조회
+app.get('/api/account-templates', async (c) => {
+  const { env } = c
+  const { type } = c.req.query()
+  
+  let query = 'SELECT * FROM account_templates'
+  const params: any[] = []
+  
+  if (type && type !== 'all') {
+    query += ' WHERE type = ? OR type = ?'
+    params.push(type, 'both')
+  }
+  
+  query += ' ORDER BY usage_count DESC, name ASC'
+  
+  const { results } = await env.DB.prepare(query).bind(...params).all()
+  return c.json(results)
+})
+
+// 계정명 템플릿 생성
+app.post('/api/account-templates', async (c) => {
+  const { env } = c
+  const { name, type, description } = await c.req.json()
+  
+  const result = await env.DB.prepare(`
+    INSERT INTO account_templates (name, type, description) 
+    VALUES (?, ?, ?)
+  `).bind(name, type || 'both', description || '').run()
+  
+  return c.json({ id: result.meta.last_row_id })
+})
+
+// 계정명 템플릿 사용 횟수 증가
+app.put('/api/account-templates/:id/use', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  
+  await env.DB.prepare(`
+    UPDATE account_templates 
+    SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP 
+    WHERE id = ?
+  `).bind(id).run()
+  
+  return c.json({ message: '사용 횟수가 증가되었습니다' })
+})
+
+// 계정명 템플릿 수정
+app.put('/api/account-templates/:id', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  const { name, type, description } = await c.req.json()
+  
+  await env.DB.prepare(`
+    UPDATE account_templates 
+    SET name = ?, type = ?, description = ?, updated_at = CURRENT_TIMESTAMP 
+    WHERE id = ?
+  `).bind(name, type, description, id).run()
+  
+  return c.json({ message: '템플릿이 수정되었습니다' })
+})
+
+// 계정명 템플릿 삭제
+app.delete('/api/account-templates/:id', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  
+  await env.DB.prepare('DELETE FROM account_templates WHERE id = ?').bind(id).run()
+  
+  return c.json({ message: '템플릿이 삭제되었습니다' })
+})
+
+// ============================================
 // API Routes - 엑셀 다운로드 (전산다운)
 // ============================================
 
@@ -738,6 +813,9 @@ app.post('/api/import/excel', async (c) => {
     const importedOrders = []
     const errors = []
     
+    // 다중건 그룹핑을 위한 맵 (BKG/BL 기준)
+    const orderGroups = new Map<string, any[]>()
+    
     // 첫 번째 행은 헤더이므로 건너뛰기
     for (let i = 1; i < data.length; i++) {
       const row = data[i]
@@ -758,12 +836,40 @@ app.post('/api/import/excel', async (c) => {
           orderType = 'lcl'
         }
         
+        // Y열: BKG/BL/NO 추출 (계정명 제거)
+        let rawBkgBlNo = String(row[24] || '').trim()
+        let accountName = ''
+        
+        // 계정명_BKG 형식인 경우 분리
+        if (rawBkgBlNo.includes('_')) {
+          const parts = rawBkgBlNo.split('_')
+          if (parts.length >= 2) {
+            accountName = parts[0]
+            rawBkgBlNo = parts.slice(1).join('_')
+          }
+        }
+        
+        // 컨테이너 넘버에서도 계정명 추출 (Q열)
+        let containerNumber = String(row[16] || '').trim()
+        if (containerNumber.includes('_') && !accountName) {
+          const parts = containerNumber.split('_')
+          if (parts.length >= 2) {
+            accountName = parts[0]
+            containerNumber = parts.slice(1).join('_')
+          }
+        }
+        
+        // 그룹 키 생성 (작업일 + BKG/BL + 화주)
+        const workDate = String(row[2] || '').trim()
+        const shipper = String(row[4] || '').trim()
+        const groupKey = `${workDate}|${rawBkgBlNo}|${shipper}`
+        
         // 오더 데이터 구성
         const orderData: any = {
           order_type: orderType,
-          work_datetime: row[2] || '',  // C: 작업일
+          work_datetime: workDate,
           billing_company: row[3] || '',  // D: 청구처
-          shipper: row[4] || '',  // E: 화주
+          shipper: shipper,
           work_site_code: row[5] || '',  // F: 작업지코드
           work_site: row[6] || '',  // G: 작업지
           container_size: row[7] || '',  // H: 컨테이너사이즈
@@ -775,25 +881,27 @@ app.post('/api/import/excel', async (c) => {
           shipping_line_code: row[13] || '',  // N: 선사코드
           vessel_name: row[14] || '',  // O: 선명
           berth_date: row[15] || '',  // P: 접안일
-          container_number: row[16] || '',  // Q: 컨테이너 넘버
+          container_number: containerNumber,
           seal_number: row[17] || '',  // R: 씰넘버
           dispatch_company: row[18] || '',  // S: 배차업체
           vehicle_info: row[19] || '',  // T: 차량정보
           contact_person: row[25] || '',  // Z: 담당자
           status: 'pending',
           weighing_required: 0,
-          remarks: []
+          remarks: [],
+          billing_amount: parseFloat(String(row[21] || '0')),  // V: 청구금액
+          payment_amount: parseFloat(String(row[22] || '0')),  // W: 하불금액
+          account_name: accountName  // 계정명
         }
         
-        // Y열: BKG/BL/NO
-        if (row[24]) {
-          const bkgBlNo = String(row[24])
+        // BKG/BL/NO 설정
+        if (rawBkgBlNo) {
           if (orderType === 'container_export') {
-            orderData.booking_number = bkgBlNo
+            orderData.booking_number = rawBkgBlNo
           } else if (orderType === 'container_import') {
-            orderData.bl_number = bkgBlNo
+            orderData.bl_number = rawBkgBlNo
           } else {
-            orderData.order_no = bkgBlNo
+            orderData.order_no = rawBkgBlNo
           }
         }
         
@@ -808,23 +916,22 @@ app.post('/api/import/excel', async (c) => {
           }
         }
         
-        // 청구/하불
-        orderData.billings = []
-        orderData.payments = []
-        
-        if (row[21]) {  // V: 청구금액
-          orderData.billings.push({
-            amount: parseFloat(String(row[21])) || 0,
-            description: ''
-          })
+        // 그룹에 추가 (같은 BKG/BL이면 그룹핑)
+        if (!orderGroups.has(groupKey)) {
+          orderGroups.set(groupKey, [])
         }
+        orderGroups.get(groupKey)!.push(orderData)
         
-        if (row[22]) {  // W: 하불금액
-          orderData.payments.push({
-            amount: parseFloat(String(row[22])) || 0,
-            description: ''
-          })
-        }
+      } catch (error: any) {
+        errors.push({ row: i + 1, error: error.message })
+      }
+    }
+    
+    // 그룹별로 오더 생성 (다중건 자동 처리)
+    for (const [groupKey, orders] of orderGroups.entries()) {
+      try {
+        // 첫 번째 오더 데이터를 기본으로 사용
+        const baseOrder = orders[0]
         
         // 오더 삽입
         const result = await env.DB.prepare(`
@@ -840,42 +947,51 @@ app.post('/api/import/excel', async (c) => {
             dispatch_company, vehicle_info, status, weighing_required
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-          orderData.order_type, orderData.billing_company, orderData.shipper, 
-          orderData.work_site, orderData.work_site_code,
-          orderData.contact_person, '', orderData.work_datetime,
-          orderData.booking_number, orderData.container_size, orderData.shipping_line, 
-          orderData.vessel_name, '', orderData.berth_date, '', '',
-          orderData.container_number, '', orderData.seal_number,
-          orderData.bl_number, '', '', orderData.order_no,
-          orderData.loading_location, orderData.loading_location_code,
-          orderData.unloading_location, orderData.unloading_location_code,
-          orderData.dispatch_company, orderData.vehicle_info, 
-          orderData.status, orderData.weighing_required
+          baseOrder.order_type, baseOrder.billing_company, baseOrder.shipper, 
+          baseOrder.work_site, baseOrder.work_site_code,
+          baseOrder.contact_person, '', baseOrder.work_datetime,
+          baseOrder.booking_number, baseOrder.container_size, baseOrder.shipping_line, 
+          baseOrder.vessel_name, '', baseOrder.berth_date, '', '',
+          baseOrder.container_number, '', baseOrder.seal_number,
+          baseOrder.bl_number, '', '', baseOrder.order_no,
+          baseOrder.loading_location, baseOrder.loading_location_code,
+          baseOrder.unloading_location, baseOrder.unloading_location_code,
+          baseOrder.dispatch_company, baseOrder.vehicle_info, 
+          baseOrder.status, baseOrder.weighing_required
         ).run()
         
         const orderId = result.meta.last_row_id
         
-        // 비고 삽입
-        for (const remark of orderData.remarks) {
-          await env.DB.prepare('INSERT INTO order_remarks (order_id, content, importance) VALUES (?, ?, ?)')
-            .bind(orderId, remark.content, remark.importance).run()
+        // 비고 삽입 (중복 제거)
+        const uniqueRemarks = new Set<string>()
+        for (const order of orders) {
+          for (const remark of order.remarks) {
+            if (!uniqueRemarks.has(remark.content)) {
+              uniqueRemarks.add(remark.content)
+              await env.DB.prepare('INSERT INTO order_remarks (order_id, content, importance) VALUES (?, ?, ?)')
+                .bind(orderId, remark.content, remark.importance).run()
+            }
+          }
         }
         
-        // 청구 삽입
-        for (const billing of orderData.billings) {
-          await env.DB.prepare('INSERT INTO billings (order_id, amount, description) VALUES (?, ?, ?)')
-            .bind(orderId, billing.amount, billing.description).run()
+        // 청구/하불 삽입 (각 행마다 별도로 추가)
+        for (const order of orders) {
+          // 청구 추가
+          if (order.billing_amount > 0) {
+            await env.DB.prepare('INSERT INTO billings (order_id, amount, description) VALUES (?, ?, ?)')
+              .bind(orderId, order.billing_amount, order.account_name || '').run()
+          }
+          
+          // 하불 추가
+          if (order.payment_amount > 0) {
+            await env.DB.prepare('INSERT INTO payments (order_id, amount, description) VALUES (?, ?, ?)')
+              .bind(orderId, order.payment_amount, order.account_name || '').run()
+          }
         }
         
-        // 하불 삽입
-        for (const payment of orderData.payments) {
-          await env.DB.prepare('INSERT INTO payments (order_id, amount, description) VALUES (?, ?, ?)')
-            .bind(orderId, payment.amount, payment.description).run()
-        }
-        
-        importedOrders.push({ row: i + 1, id: orderId })
+        importedOrders.push({ groupKey, orderId, count: orders.length })
       } catch (error: any) {
-        errors.push({ row: i + 1, error: error.message })
+        errors.push({ groupKey, error: error.message })
       }
     }
     
