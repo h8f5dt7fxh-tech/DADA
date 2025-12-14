@@ -4,7 +4,7 @@
 const state = {
   currentPage: 'orders',
   currentView: 'month',
-  currentDate: '2025-12-01',
+  currentDate: dayjs().format('YYYY-MM-DD'), // 현재 날짜로 초기화
   currentOrderType: 'all',
   searchQuery: '',
   orders: [],
@@ -17,7 +17,8 @@ const state = {
   workSites: [],
   todos: [],
   inputMode: 'text',  // 'text', 'form', 'excel'
-  formOrderType: 'container_export'  // 폼 입력 시 선택된 오더 타입
+  formOrderType: 'container_export',  // 폼 입력 시 선택된 오더 타입
+  isLoading: false  // 로딩 상태 추가
 }
 
 // ============================================
@@ -246,6 +247,9 @@ ${importantRemarks.map(r => '* ' + r.content).join('\n')}`
 
 async function fetchOrders() {
   try {
+    state.isLoading = true
+    renderOrderList() // 로딩 표시
+    
     // 월별 뷰일 때는 YYYY-MM 형식으로 변환
     let dateParam = state.currentDate
     if (state.currentView === 'month' && dateParam && dateParam.length > 7) {
@@ -264,10 +268,12 @@ async function fetchOrders() {
     
     const response = await axios.get(`/api/orders?${params}`)
     state.orders = response.data
-    renderOrderList()
   } catch (error) {
     console.error('오더 조회 실패:', error)
     alert('오더 조회에 실패했습니다.')
+  } finally {
+    state.isLoading = false
+    renderOrderList()
   }
 }
 
@@ -678,6 +684,19 @@ function renderOrderCard(order) {
 function renderOrderList() {
   const listContainer = document.getElementById('orderListContainer')
   if (!listContainer) return
+  
+  // 로딩 중 표시
+  if (state.isLoading) {
+    listContainer.innerHTML = `
+      <div class="flex items-center justify-center py-20">
+        <div class="text-center">
+          <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+          <p class="text-gray-600">오더를 불러오는 중...</p>
+        </div>
+      </div>
+    `
+    return
+  }
   
   // 월별/주별 뷰: 카드 형식
   if (state.currentView === 'month' || state.currentView === 'week') {
