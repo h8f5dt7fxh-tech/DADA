@@ -306,6 +306,153 @@ async function deleteOrder(id) {
   }
 }
 
+function editOrder(id) {
+  const order = state.orders.find(o => o.id === id)
+  if (!order) {
+    alert('오더를 찾을 수 없습니다.')
+    return
+  }
+  
+  // 모든 모달 닫기
+  document.querySelectorAll('.fixed').forEach(modal => modal.remove())
+  
+  // 수정 모달 생성
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-2xl font-bold">오더 수정</h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      
+      <form id="editOrderForm" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">청구처</label>
+            <input type="text" name="billing_company" value="${order.billing_company}" class="w-full border rounded px-3 py-2" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">화주</label>
+            <input type="text" name="shipper" value="${order.shipper}" class="w-full border rounded px-3 py-2" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">작업지</label>
+            <input type="text" name="work_site" value="${order.work_site || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">작업일시</label>
+            <input type="datetime-local" name="work_datetime" value="${order.work_datetime.replace(' ', 'T').substring(0, 16)}" class="w-full border rounded px-3 py-2" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">BKG/BL/NO</label>
+            <input type="text" name="booking_number" value="${order.booking_number || order.bl_number || order.order_no || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">컨테이너 사이즈</label>
+            <input type="text" name="container_size" value="${order.container_size || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">상차지</label>
+            <input type="text" name="loading_location" value="${order.loading_location || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">하차지</label>
+            <input type="text" name="unloading_location" value="${order.unloading_location || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">배차업체</label>
+            <input type="text" name="dispatch_company" value="${order.dispatch_company || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">차량정보</label>
+            <input type="text" name="vehicle_info" value="${order.vehicle_info || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">담당자</label>
+            <input type="text" name="contact_person" value="${order.contact_person || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">연락처</label>
+            <input type="text" name="contact_phone" value="${order.contact_phone || ''}" class="w-full border rounded px-3 py-2">
+          </div>
+        </div>
+        
+        <div class="flex justify-end space-x-2">
+          <button type="button" onclick="this.closest('.fixed').remove()" class="px-4 py-2 border rounded hover:bg-gray-100">
+            취소
+          </button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            <i class="fas fa-save mr-1"></i>저장
+          </button>
+        </div>
+      </form>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  // 폼 제출 핸들러
+  document.getElementById('editOrderForm').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    const data = Object.fromEntries(formData)
+    
+    // 작업일시 변환
+    data.work_datetime = data.work_datetime.replace('T', ' ') + ':00'
+    
+    // BKG/BL/NO 처리
+    if (order.order_type === 'container_export') {
+      data.booking_number = data.booking_number
+      data.bl_number = ''
+      data.order_no = ''
+    } else if (order.order_type === 'container_import') {
+      data.bl_number = data.booking_number
+      data.booking_number = ''
+      data.order_no = ''
+    } else {
+      data.order_no = data.booking_number
+      data.booking_number = ''
+      data.bl_number = ''
+    }
+    
+    // 기존 데이터 유지
+    data.order_type = order.order_type
+    data.status = order.status || 'pending'
+    data.weighing_required = order.weighing_required || 0
+    data.work_site_code = order.work_site_code || ''
+    data.shipping_line = order.shipping_line || ''
+    data.vessel_name = order.vessel_name || ''
+    data.export_country = order.export_country || ''
+    data.berth_date = order.berth_date || ''
+    data.departure_date = order.departure_date || ''
+    data.weight = order.weight || ''
+    data.container_number = order.container_number || ''
+    data.tw = order.tw || ''
+    data.seal_number = order.seal_number || ''
+    data.do_status = order.do_status || ''
+    data.customs_clearance = order.customs_clearance || ''
+    data.loading_location_code = order.loading_location_code || ''
+    data.unloading_location_code = order.unloading_location_code || ''
+    
+    try {
+      await axios.put(`/api/orders/${id}`, data)
+      alert('오더가 수정되었습니다.')
+      modal.remove()
+      fetchOrders()
+    } catch (error) {
+      console.error('오더 수정 실패:', error)
+      alert('오더 수정에 실패했습니다.')
+    }
+  })
+}
+
 async function fetchLocationCodes() {
   try {
     const response = await axios.get('/api/location-codes')
