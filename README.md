@@ -12,7 +12,7 @@
 ## 🌐 접속 URL
 
 - **Production**: https://transport-system-f56.pages.dev
-- **Latest Deploy**: https://2b42728e.transport-system-f56.pages.dev
+- **Latest Deploy**: https://18865e7c.transport-system-f56.pages.dev
 - **GitHub**: https://github.com/h8f5dt7fxh-tech/DADA
 
 ## ✅ 완료된 기능
@@ -71,7 +71,17 @@
   - 컨테이너 넘버에도 계정명 추가
   - 개별 청구/하불 금액 및 수익 계산
 
-### 8. 할일 메모
+### 8. 청구/하불 관리 (NEW!)
+- ✅ **청구 추가**: 오더별로 여러 청구 건 추가 가능
+  - 계정명 필드 (선택): 엑셀 다운로드 시 BKG/BL 앞에 표시
+  - 금액 필드 (필수)
+- ✅ **하불 추가**: 오더별로 여러 하불 건 추가 가능
+  - 계정명 필드 (선택): 엑셀 다운로드 시 BKG/BL 앞에 표시
+  - 금액 필드 (필수)
+- ✅ 청구/하불 개별 삭제
+- ✅ 합계 및 수익 자동 계산
+
+### 9. 할일 메모
 - ✅ 간단한 할일 추가/삭제
 - ✅ 완료 체크
 - ✅ 메모 관리
