@@ -76,25 +76,31 @@ app.get('/api/orders', async (c) => {
   if (!includeDetails) {
     // 간단한 집계 정보만 추가 (청구/하불 합계)
     const orderIds = results.map((order: any) => order.id)
-    const idsPlaceholder = orderIds.map(() => '?').join(',')
     
-    const [billingsRes, paymentsRes] = await Promise.all([
-      env.DB.prepare(`SELECT order_id, SUM(amount) as total FROM billings WHERE order_id IN (${idsPlaceholder}) GROUP BY order_id`)
-        .bind(...orderIds).all(),
-      env.DB.prepare(`SELECT order_id, SUM(amount) as total FROM payments WHERE order_id IN (${idsPlaceholder}) GROUP BY order_id`)
-        .bind(...orderIds).all()
-    ])
-    
+    // SQLite 변수 제한 (999개) 회피: 배치 처리
+    const batchSize = 500
     const billingTotals: any = {}
     const paymentTotals: any = {}
     
-    billingsRes.results.forEach((b: any) => {
-      billingTotals[b.order_id] = b.total || 0
-    })
-    
-    paymentsRes.results.forEach((p: any) => {
-      paymentTotals[p.order_id] = p.total || 0
-    })
+    for (let i = 0; i < orderIds.length; i += batchSize) {
+      const batch = orderIds.slice(i, i + batchSize)
+      const idsPlaceholder = batch.map(() => '?').join(',')
+      
+      const [billingsRes, paymentsRes] = await Promise.all([
+        env.DB.prepare(`SELECT order_id, SUM(amount) as total FROM billings WHERE order_id IN (${idsPlaceholder}) GROUP BY order_id`)
+          .bind(...batch).all(),
+        env.DB.prepare(`SELECT order_id, SUM(amount) as total FROM payments WHERE order_id IN (${idsPlaceholder}) GROUP BY order_id`)
+          .bind(...batch).all()
+      ])
+      
+      billingsRes.results.forEach((b: any) => {
+        billingTotals[b.order_id] = b.total || 0
+      })
+      
+      paymentsRes.results.forEach((p: any) => {
+        paymentTotals[p.order_id] = p.total || 0
+      })
+    }
     
     const ordersWithTotals = results.map((order: any) => ({
       ...order,
@@ -108,16 +114,34 @@ app.get('/api/orders', async (c) => {
   
   // 일별 조회: 상세 정보 포함
   const orderIds = results.map((order: any) => order.id)
-  const idsPlaceholder = orderIds.map(() => '?').join(',')
   
-  const [remarksRes, billingsRes, paymentsRes] = await Promise.all([
-    env.DB.prepare(`SELECT * FROM order_remarks WHERE order_id IN (${idsPlaceholder}) ORDER BY created_at ASC`)
-      .bind(...orderIds).all(),
-    env.DB.prepare(`SELECT * FROM billings WHERE order_id IN (${idsPlaceholder})`)
-      .bind(...orderIds).all(),
-    env.DB.prepare(`SELECT * FROM payments WHERE order_id IN (${idsPlaceholder})`)
-      .bind(...orderIds).all()
-  ])
+  // SQLite 변수 제한 (999개) 회피: 배치 처리
+  const batchSize = 500
+  let allRemarks: any[] = []
+  let allBillings: any[] = []
+  let allPayments: any[] = []
+  
+  for (let i = 0; i < orderIds.length; i += batchSize) {
+    const batch = orderIds.slice(i, i + batchSize)
+    const idsPlaceholder = batch.map(() => '?').join(',')
+    
+    const [remarksRes, billingsRes, paymentsRes] = await Promise.all([
+      env.DB.prepare(`SELECT * FROM order_remarks WHERE order_id IN (${idsPlaceholder}) ORDER BY created_at ASC`)
+        .bind(...batch).all(),
+      env.DB.prepare(`SELECT * FROM billings WHERE order_id IN (${idsPlaceholder})`)
+        .bind(...batch).all(),
+      env.DB.prepare(`SELECT * FROM payments WHERE order_id IN (${idsPlaceholder})`)
+        .bind(...batch).all()
+    ])
+    
+    allRemarks = allRemarks.concat(remarksRes.results)
+    allBillings = allBillings.concat(billingsRes.results)
+    allPayments = allPayments.concat(paymentsRes.results)
+  }
+  
+  const remarksRes = { results: allRemarks }
+  const billingsRes = { results: allBillings }
+  const paymentsRes = { results: allPayments }
   
   const remarksByOrderId: any = {}
   const billingsByOrderId: any = {}
