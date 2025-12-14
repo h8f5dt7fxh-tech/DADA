@@ -1228,11 +1228,13 @@ function renderExcelInputMode() {
 
 function changeView(view) {
   state.currentView = view
+  render()
   fetchOrders()
 }
 
 function changeDate(date) {
   state.currentDate = date
+  render()
   fetchOrders()
 }
 
