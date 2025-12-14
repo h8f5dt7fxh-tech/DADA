@@ -351,7 +351,8 @@ async function editOrder(id) {
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-1">청구처</label>
-            <input type="text" name="billing_company" value="${order.billing_company}" class="w-full border rounded px-3 py-2" required>
+            <input type="text" name="billing_company" id="edit_billing_company" value="${order.billing_company}" class="w-full border rounded px-3 py-2" required onchange="fetchSalesPersonForBillingCompany(this.value, 'edit_sales_person')">
+            <div id="edit_sales_person_container" class="mt-1 text-sm text-blue-600"></div>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">화주</label>
@@ -1066,19 +1067,549 @@ async function deleteDispatchCompany(id) {
 }
 
 function showAddLocationCodeModal() {
-  alert('상하차지 코드 추가 모달은 곧 구현됩니다.')
+  const modalHtml = `
+    <div id="locationModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">상하차지 코드 추가</h3>
+          <button onclick="closeLocationModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block font-semibold mb-1">상하차지명 *</label>
+            <input type="text" id="location_name" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-1">코드 *</label>
+            <input type="text" id="location_code" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-1">배차업체</label>
+            <input type="text" id="location_dispatch_company" class="w-full px-3 py-2 border rounded">
+          </div>
+          
+          <div class="flex justify-end space-x-2 mt-6">
+            <button onclick="closeLocationModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+              취소
+            </button>
+            <button onclick="saveLocationCode()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              저장
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+}
+
+async function editLocationCode(id) {
+  const location = state.locationCodes.find(l => l.id === id)
+  if (!location) return
+  
+  const modalHtml = `
+    <div id="locationModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">상하차지 코드 수정</h3>
+          <button onclick="closeLocationModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block font-semibold mb-1">상하차지명 *</label>
+            <input type="text" id="location_name" value="${location.name}" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-1">코드 *</label>
+            <input type="text" id="location_code" value="${location.code}" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-1">배차업체</label>
+            <input type="text" id="location_dispatch_company" value="${location.dispatch_company || ''}" class="w-full px-3 py-2 border rounded">
+          </div>
+          
+          <div class="flex justify-end space-x-2 mt-6">
+            <button onclick="closeLocationModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+              취소
+            </button>
+            <button onclick="updateLocationCode(${location.id})" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              수정
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+}
+
+function closeLocationModal() {
+  const modal = document.getElementById('locationModal')
+  if (modal) modal.remove()
+}
+
+async function saveLocationCode() {
+  const name = document.getElementById('location_name').value.trim()
+  const code = document.getElementById('location_code').value.trim()
+  
+  if (!name || !code) {
+    alert('상하차지명과 코드는 필수입니다.')
+    return
+  }
+  
+  const data = {
+    name,
+    code,
+    dispatch_company: document.getElementById('location_dispatch_company').value.trim()
+  }
+  
+  try {
+    await axios.post('/api/location-codes', data)
+    alert('상하차지 코드가 추가되었습니다.')
+    closeLocationModal()
+    await fetchLocationCodes()
+    renderApp()
+  } catch (error) {
+    console.error('상하차지 코드 추가 실패:', error)
+    alert('상하차지 코드 추가에 실패했습니다.')
+  }
+}
+
+async function updateLocationCode(id) {
+  const name = document.getElementById('location_name').value.trim()
+  const code = document.getElementById('location_code').value.trim()
+  
+  if (!name || !code) {
+    alert('상하차지명과 코드는 필수입니다.')
+    return
+  }
+  
+  const data = {
+    name,
+    code,
+    dispatch_company: document.getElementById('location_dispatch_company').value.trim()
+  }
+  
+  try {
+    await axios.put(`/api/location-codes/${id}`, data)
+    alert('상하차지 코드가 수정되었습니다.')
+    closeLocationModal()
+    await fetchLocationCodes()
+    renderApp()
+  } catch (error) {
+    console.error('상하차지 코드 수정 실패:', error)
+    alert('상하차지 코드 수정에 실패했습니다.')
+  }
 }
 
 function showAddShippingLineModal() {
-  alert('선사 코드 추가 모달은 곧 구현됩니다.')
+  const modalHtml = `
+    <div id="shippingModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">선사 코드 추가</h3>
+          <button onclick="closeShippingModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block font-semibold mb-1">선사명 *</label>
+            <input type="text" id="shipping_name" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-1">코드 *</label>
+            <input type="text" id="shipping_code" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div class="flex justify-end space-x-2 mt-6">
+            <button onclick="closeShippingModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+              취소
+            </button>
+            <button onclick="saveShippingLine()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              저장
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+}
+
+async function editShippingLine(id) {
+  const shipping = state.shippingLines.find(s => s.id === id)
+  if (!shipping) return
+  
+  const modalHtml = `
+    <div id="shippingModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">선사 코드 수정</h3>
+          <button onclick="closeShippingModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block font-semibold mb-1">선사명 *</label>
+            <input type="text" id="shipping_name" value="${shipping.name}" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-1">코드 *</label>
+            <input type="text" id="shipping_code" value="${shipping.code}" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div class="flex justify-end space-x-2 mt-6">
+            <button onclick="closeShippingModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+              취소
+            </button>
+            <button onclick="updateShippingLine(${shipping.id})" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              수정
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+}
+
+function closeShippingModal() {
+  const modal = document.getElementById('shippingModal')
+  if (modal) modal.remove()
+}
+
+async function saveShippingLine() {
+  const name = document.getElementById('shipping_name').value.trim()
+  const code = document.getElementById('shipping_code').value.trim()
+  
+  if (!name || !code) {
+    alert('선사명과 코드는 필수입니다.')
+    return
+  }
+  
+  const data = { name, code }
+  
+  try {
+    await axios.post('/api/shipping-lines', data)
+    alert('선사 코드가 추가되었습니다.')
+    closeShippingModal()
+    await fetchShippingLines()
+    renderApp()
+  } catch (error) {
+    console.error('선사 코드 추가 실패:', error)
+    alert('선사 코드 추가에 실패했습니다.')
+  }
+}
+
+async function updateShippingLine(id) {
+  const name = document.getElementById('shipping_name').value.trim()
+  const code = document.getElementById('shipping_code').value.trim()
+  
+  if (!name || !code) {
+    alert('선사명과 코드는 필수입니다.')
+    return
+  }
+  
+  const data = { name, code }
+  
+  try {
+    await axios.put(`/api/shipping-lines/${id}`, data)
+    alert('선사 코드가 수정되었습니다.')
+    closeShippingModal()
+    await fetchShippingLines()
+    renderApp()
+  } catch (error) {
+    console.error('선사 코드 수정 실패:', error)
+    alert('선사 코드 수정에 실패했습니다.')
+  }
 }
 
 function showAddDispatchCompanyModal() {
-  alert('협력업체 추가 모달은 곧 구현됩니다.')
+  const modalHtml = `
+    <div id="dispatchModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">협력업체 추가</h3>
+          <button onclick="closeDispatchModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block font-semibold mb-1">업체명 *</label>
+            <input type="text" id="dispatch_name" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block font-semibold mb-1">담당자</label>
+              <input type="text" id="dispatch_manager" class="w-full px-3 py-2 border rounded">
+            </div>
+            <div>
+              <label class="block font-semibold mb-1">연락처</label>
+              <input type="text" id="dispatch_contact" class="w-full px-3 py-2 border rounded">
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block font-semibold mb-1">운송유형</label>
+              <input type="text" id="dispatch_transport_type" placeholder="DRY, HC, RF 등" class="w-full px-3 py-2 border rounded">
+            </div>
+            <div>
+              <label class="block font-semibold mb-1">운송지역</label>
+              <input type="text" id="dispatch_transport_area" placeholder="부산, 광양 등" class="w-full px-3 py-2 border rounded">
+            </div>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-1">비고</label>
+            <textarea id="dispatch_notes" rows="3" class="w-full px-3 py-2 border rounded"></textarea>
+          </div>
+          
+          <div class="flex justify-end space-x-2 mt-6">
+            <button onclick="closeDispatchModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+              취소
+            </button>
+            <button onclick="saveDispatchCompany()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              저장
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
 }
 
-function editDispatchCompany(id) {
-  alert('협력업체 수정 모달은 곧 구현됩니다.')
+async function editDispatchCompany(id) {
+  const company = state.dispatchCompanies.find(c => c.id === id)
+  if (!company) return
+  
+  const modalHtml = `
+    <div id="dispatchModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">협력업체 수정</h3>
+          <button onclick="closeDispatchModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block font-semibold mb-1">업체명 *</label>
+            <input type="text" id="dispatch_name" value="${company.name}" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block font-semibold mb-1">담당자</label>
+              <input type="text" id="dispatch_manager" value="${company.manager || ''}" class="w-full px-3 py-2 border rounded">
+            </div>
+            <div>
+              <label class="block font-semibold mb-1">연락처</label>
+              <input type="text" id="dispatch_contact" value="${company.contact || ''}" class="w-full px-3 py-2 border rounded">
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block font-semibold mb-1">운송유형</label>
+              <input type="text" id="dispatch_transport_type" value="${company.transport_type || ''}" placeholder="DRY, HC, RF 등" class="w-full px-3 py-2 border rounded">
+            </div>
+            <div>
+              <label class="block font-semibold mb-1">운송지역</label>
+              <input type="text" id="dispatch_transport_area" value="${company.transport_area || ''}" placeholder="부산, 광양 등" class="w-full px-3 py-2 border rounded">
+            </div>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-1">비고</label>
+            <textarea id="dispatch_notes" rows="3" class="w-full px-3 py-2 border rounded">${company.notes || ''}</textarea>
+          </div>
+          
+          <div class="flex justify-end space-x-2 mt-6">
+            <button onclick="closeDispatchModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+              취소
+            </button>
+            <button onclick="updateDispatchCompany(${company.id})" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              수정
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+}
+
+function closeDispatchModal() {
+  const modal = document.getElementById('dispatchModal')
+  if (modal) modal.remove()
+}
+
+async function saveDispatchCompany() {
+  const name = document.getElementById('dispatch_name').value.trim()
+  if (!name) {
+    alert('업체명은 필수입니다.')
+    return
+  }
+  
+  const data = {
+    name,
+    manager: document.getElementById('dispatch_manager').value.trim(),
+    contact: document.getElementById('dispatch_contact').value.trim(),
+    transport_type: document.getElementById('dispatch_transport_type').value.trim(),
+    transport_area: document.getElementById('dispatch_transport_area').value.trim(),
+    notes: document.getElementById('dispatch_notes').value.trim()
+  }
+  
+  try {
+    await axios.post('/api/dispatch-companies', data)
+    alert('협력업체가 추가되었습니다.')
+    closeDispatchModal()
+    await fetchDispatchCompanies()
+    renderApp()
+  } catch (error) {
+    console.error('협력업체 추가 실패:', error)
+    alert('협력업체 추가에 실패했습니다.')
+  }
+}
+
+async function updateDispatchCompany(id) {
+  const name = document.getElementById('dispatch_name').value.trim()
+  if (!name) {
+    alert('업체명은 필수입니다.')
+    return
+  }
+  
+  const data = {
+    name,
+    manager: document.getElementById('dispatch_manager').value.trim(),
+    contact: document.getElementById('dispatch_contact').value.trim(),
+    transport_type: document.getElementById('dispatch_transport_type').value.trim(),
+    transport_area: document.getElementById('dispatch_transport_area').value.trim(),
+    notes: document.getElementById('dispatch_notes').value.trim()
+  }
+  
+  try {
+    await axios.put(`/api/dispatch-companies/${id}`, data)
+    alert('협력업체가 수정되었습니다.')
+    closeDispatchModal()
+    await fetchDispatchCompanies()
+    renderApp()
+  } catch (error) {
+    console.error('협력업체 수정 실패:', error)
+    alert('협력업체 수정에 실패했습니다.')
+  }
+}
+
+async function deleteDispatchCompany(id) {
+  if (!confirm('이 협력업체를 삭제하시겠습니까?')) return
+  
+  try {
+    await axios.delete(`/api/dispatch-companies/${id}`)
+    alert('협력업체가 삭제되었습니다.')
+    await fetchDispatchCompanies()
+    renderApp()
+  } catch (error) {
+    console.error('협력업체 삭제 실패:', error)
+    alert('협력업체 삭제에 실패했습니다.')
+  }
+}
+
+function showUploadDispatchCompaniesModal() {
+  const modalHtml = `
+    <div id="uploadModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-xl">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">협력업체 엑셀 업로드</h3>
+          <button onclick="closeUploadModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="mb-4">
+          <p class="text-sm text-gray-600 mb-2">엑셀 파일 형식:</p>
+          <ul class="text-xs text-gray-500 list-disc list-inside">
+            <li>1열: 구분 (운송 등)</li>
+            <li>2열: 업체명</li>
+            <li>3열: 담당자</li>
+            <li>4열: 연락처</li>
+            <li>5열: 운송유형 (DRY, HC 등)</li>
+            <li>6열: 운송지역</li>
+          </ul>
+        </div>
+        
+        <div class="mb-4">
+          <input type="file" id="dispatch_excel_file" accept=".xlsx,.xls" class="w-full px-3 py-2 border rounded">
+        </div>
+        
+        <div class="flex justify-end space-x-2">
+          <button onclick="closeUploadModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+            취소
+          </button>
+          <button onclick="uploadDispatchExcel()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            업로드
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+}
+
+function closeUploadModal() {
+  const modal = document.getElementById('uploadModal')
+  if (modal) modal.remove()
+}
+
+async function uploadDispatchExcel() {
+  const fileInput = document.getElementById('dispatch_excel_file')
+  const file = fileInput.files[0]
+  
+  if (!file) {
+    alert('파일을 선택해주세요.')
+    return
+  }
+  
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  try {
+    const response = await axios.post('/api/admin/import-dispatch-companies-excel', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'X-Admin-Key': 'reset-transport-db-2024'
+      }
+    })
+    
+    alert(`협력업체 데이터 업로드 완료\n업데이트: ${response.data.updated}개\n신규: ${response.data.inserted}개`)
+    closeUploadModal()
+    await fetchDispatchCompanies()
+    renderApp()
+  } catch (error) {
+    console.error('엑셀 업로드 실패:', error)
+    alert('엑셀 업로드에 실패했습니다.')
+  }
 }
 
 function showAddBillingCompanyModal() {
@@ -1110,7 +1641,8 @@ function renderFormFields() {
           </div>
           <div>
             <label class="block mb-1 font-semibold">청구처 :</label>
-            <input type="text" id="field_billing" placeholder="베스트부품" class="w-full px-3 py-2 border rounded">
+            <input type="text" id="field_billing" placeholder="베스트부품" class="w-full px-3 py-2 border rounded" onchange="fetchSalesPersonForBillingCompany(this.value, 'form_sales_person')">
+            <div id="form_sales_person_container" class="mt-1 text-sm text-blue-600"></div>
           </div>
         </div>
         
@@ -2072,6 +2604,34 @@ function goToOrderFromTodo(orderId) {
       viewOrderDetail(orderId)
     }, 100)
   })
+}
+
+// ============================================
+// 영업담당자 자동 추천
+// ============================================
+
+async function fetchSalesPersonForBillingCompany(billingCompany, targetContainerId) {
+  const container = document.getElementById(`${targetContainerId}_container`)
+  if (!container) return
+  
+  if (!billingCompany || billingCompany.trim() === '') {
+    container.innerHTML = ''
+    return
+  }
+  
+  try {
+    const response = await axios.get(`/api/sales-person/${encodeURIComponent(billingCompany.trim())}`)
+    const salesPerson = response.data.sales_person
+    
+    if (salesPerson) {
+      container.innerHTML = `<i class="fas fa-user mr-1"></i>영업담당자: <strong>${salesPerson}</strong>`
+    } else {
+      container.innerHTML = '<i class="fas fa-info-circle mr-1"></i>영업담당자 정보 없음'
+    }
+  } catch (error) {
+    console.error('영업담당자 조회 실패:', error)
+    container.innerHTML = ''
+  }
 }
 
 // ============================================
