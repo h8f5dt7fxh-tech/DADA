@@ -881,6 +881,7 @@ function renderCodesManagementPage() {
                 <th class="px-3 py-2 text-left">상하차지명</th>
                 <th class="px-3 py-2 text-left">코드</th>
                 <th class="px-3 py-2 text-left">배차업체</th>
+                <th class="px-3 py-2 text-center">수정</th>
                 <th class="px-3 py-2 text-center">삭제</th>
               </tr>
             </thead>
@@ -890,6 +891,11 @@ function renderCodesManagementPage() {
                   <td class="px-3 py-2">${loc.name}</td>
                   <td class="px-3 py-2">${loc.code}</td>
                   <td class="px-3 py-2">${loc.dispatch_company || '-'}</td>
+                  <td class="px-3 py-2 text-center">
+                    <button onclick="editLocationCode(${loc.id})" class="text-blue-600 hover:text-blue-800">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                  </td>
                   <td class="px-3 py-2 text-center">
                     <button onclick="deleteLocationCode(${loc.id})" class="text-red-600 hover:text-red-800">
                       <i class="fas fa-trash"></i>
@@ -918,6 +924,7 @@ function renderCodesManagementPage() {
               <tr>
                 <th class="px-3 py-2 text-left">선사명</th>
                 <th class="px-3 py-2 text-left">코드</th>
+                <th class="px-3 py-2 text-center">수정</th>
                 <th class="px-3 py-2 text-center">삭제</th>
               </tr>
             </thead>
@@ -926,6 +933,11 @@ function renderCodesManagementPage() {
                 <tr class="border-b hover:bg-gray-50">
                   <td class="px-3 py-2">${ship.name}</td>
                   <td class="px-3 py-2">${ship.code}</td>
+                  <td class="px-3 py-2 text-center">
+                    <button onclick="editShippingLine(${ship.id})" class="text-blue-600 hover:text-blue-800">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                  </td>
                   <td class="px-3 py-2 text-center">
                     <button onclick="deleteShippingLine(${ship.id})" class="text-red-600 hover:text-red-800">
                       <i class="fas fa-trash"></i>
@@ -943,9 +955,12 @@ function renderCodesManagementPage() {
         <h2 class="text-2xl font-bold mb-4">
           <i class="fas fa-truck mr-2"></i>협력업체 (하불업체) 관리
         </h2>
-        <div class="mb-4">
+        <div class="mb-4 flex space-x-2">
           <button onclick="showAddDispatchCompanyModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
             <i class="fas fa-plus mr-1"></i>추가
+          </button>
+          <button onclick="showUploadDispatchCompaniesModal()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            <i class="fas fa-file-excel mr-1"></i>엑셀 업로드
           </button>
         </div>
         <div class="overflow-auto max-h-96">
@@ -953,7 +968,10 @@ function renderCodesManagementPage() {
             <thead class="bg-gray-100 sticky top-0">
               <tr>
                 <th class="px-3 py-2 text-left">업체명</th>
-                <th class="px-3 py-2 text-left">하불 금액 수준</th>
+                <th class="px-3 py-2 text-left">담당자</th>
+                <th class="px-3 py-2 text-left">연락처</th>
+                <th class="px-3 py-2 text-left">운송</th>
+                <th class="px-3 py-2 text-left">운송지역</th>
                 <th class="px-3 py-2 text-left">비고</th>
                 <th class="px-3 py-2 text-center">수정</th>
                 <th class="px-3 py-2 text-center">삭제</th>
@@ -963,8 +981,11 @@ function renderCodesManagementPage() {
               ${state.dispatchCompanies.map(company => `
                 <tr class="border-b hover:bg-gray-50">
                   <td class="px-3 py-2">${company.name}</td>
-                  <td class="px-3 py-2">${company.payment_level || '-'}</td>
-                  <td class="px-3 py-2">${company.notes || '-'}</td>
+                  <td class="px-3 py-2">${company.manager || '-'}</td>
+                  <td class="px-3 py-2">${company.contact || '-'}</td>
+                  <td class="px-3 py-2">${company.transport_type || '-'}</td>
+                  <td class="px-3 py-2">${company.transport_area || '-'}</td>
+                  <td class="px-3 py-2 text-xs">${company.remarks || '-'}</td>
                   <td class="px-3 py-2 text-center">
                     <button onclick="editDispatchCompany(${company.id})" class="text-blue-600 hover:text-blue-800">
                       <i class="fas fa-edit"></i>

@@ -1042,6 +1042,197 @@ app.delete('/api/admin/reset-orders', async (c) => {
   }
 })
 
+// 협력업체 테이블 마이그레이션
+app.post('/api/admin/migrate-dispatch-companies', async (c) => {
+  const { env } = c
+  const authKey = c.req.header('X-Admin-Key')
+  
+  if (authKey !== 'reset-transport-db-2024') {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    // 컬럼이 이미 존재하는지 확인 후 추가
+    const tableInfo = await env.DB.prepare("PRAGMA table_info(dispatch_companies)").all()
+    const columnNames = tableInfo.results.map((col: any) => col.name)
+    
+    if (!columnNames.includes('manager')) {
+      await env.DB.prepare('ALTER TABLE dispatch_companies ADD COLUMN manager TEXT').run()
+    }
+    if (!columnNames.includes('contact')) {
+      await env.DB.prepare('ALTER TABLE dispatch_companies ADD COLUMN contact TEXT').run()
+    }
+    if (!columnNames.includes('transport_type')) {
+      await env.DB.prepare('ALTER TABLE dispatch_companies ADD COLUMN transport_type TEXT').run()
+    }
+    if (!columnNames.includes('transport_area')) {
+      await env.DB.prepare('ALTER TABLE dispatch_companies ADD COLUMN transport_area TEXT').run()
+    }
+    
+    return c.json({ success: true, message: '협력업체 테이블 마이그레이션 완료' })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 청구처-영업담당자 테이블 생성
+app.post('/api/admin/create-sales-mapping-table', async (c) => {
+  const { env } = c
+  const authKey = c.req.header('X-Admin-Key')
+  
+  if (authKey !== 'reset-transport-db-2024') {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS billing_company_sales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        billing_company TEXT NOT NULL UNIQUE,
+        sales_person TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    await env.DB.prepare(`
+      CREATE INDEX IF NOT EXISTS idx_billing_company_sales_company 
+      ON billing_company_sales(billing_company)
+    `).run()
+    
+    return c.json({ success: true, message: '청구처-영업담당자 테이블 생성 완료' })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 청구처별 영업담당자 조회
+app.get('/api/sales-person/:billingCompany', async (c) => {
+  const { env } = c
+  const billingCompany = decodeURIComponent(c.req.param('billingCompany'))
+  
+  try {
+    const result = await env.DB.prepare(
+      'SELECT sales_person FROM billing_company_sales WHERE billing_company = ?'
+    ).bind(billingCompany).first()
+    
+    if (result) {
+      return c.json({ billing_company: billingCompany, sales_person: result.sales_person })
+    } else {
+      return c.json({ billing_company: billingCompany, sales_person: null })
+    }
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 협력업체 대량 업데이트
+app.post('/api/admin/import-dispatch-companies', async (c) => {
+  const { env } = c
+  const authKey = c.req.header('X-Admin-Key')
+  
+  if (authKey !== 'reset-transport-db-2024') {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const { companies } = await c.req.json()
+    let updated = 0
+    let inserted = 0
+    
+    for (const company of companies) {
+      // 기존 협력업체 확인
+      const existing = await env.DB.prepare(
+        'SELECT id FROM dispatch_companies WHERE name = ?'
+      ).bind(company.name).first()
+      
+      if (existing) {
+        // 업데이트
+        await env.DB.prepare(`
+          UPDATE dispatch_companies 
+          SET manager = ?, contact = ?, transport_type = ?, transport_area = ?
+          WHERE name = ?
+        `).bind(
+          company.manager, 
+          company.contact, 
+          company.transport_type, 
+          company.transport_area,
+          company.name
+        ).run()
+        updated++
+      } else {
+        // 신규 삽입
+        await env.DB.prepare(`
+          INSERT INTO dispatch_companies (name, manager, contact, transport_type, transport_area)
+          VALUES (?, ?, ?, ?, ?)
+        `).bind(
+          company.name,
+          company.manager,
+          company.contact,
+          company.transport_type,
+          company.transport_area
+        ).run()
+        inserted++
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      updated, 
+      inserted, 
+      total: companies.length 
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 청구처-영업담당자 대량 임포트
+app.post('/api/admin/import-sales-mapping', async (c) => {
+  const { env } = c
+  const authKey = c.req.header('X-Admin-Key')
+  
+  if (authKey !== 'reset-transport-db-2024') {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const { mappings } = await c.req.json()
+    let updated = 0
+    let inserted = 0
+    
+    for (const [billingCompany, salesPerson] of Object.entries(mappings)) {
+      const existing = await env.DB.prepare(
+        'SELECT id FROM billing_company_sales WHERE billing_company = ?'
+      ).bind(billingCompany).first()
+      
+      if (existing) {
+        await env.DB.prepare(`
+          UPDATE billing_company_sales 
+          SET sales_person = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE billing_company = ?
+        `).bind(salesPerson, billingCompany).run()
+        updated++
+      } else {
+        await env.DB.prepare(`
+          INSERT INTO billing_company_sales (billing_company, sales_person)
+          VALUES (?, ?)
+        `).bind(billingCompany, salesPerson).run()
+        inserted++
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      updated, 
+      inserted, 
+      total: Object.keys(mappings).length 
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // ============================================
 // 메인 페이지
 // ============================================
