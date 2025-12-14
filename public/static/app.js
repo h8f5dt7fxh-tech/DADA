@@ -15,7 +15,9 @@ const state = {
   billingCompanies: [],
   shippers: [],
   workSites: [],
-  todos: []
+  todos: [],
+  inputMode: 'text',  // 'text', 'form', 'excel'
+  formOrderType: 'container_export'  // 폼 입력 시 선택된 오더 타입
 }
 
 // ============================================
@@ -516,33 +518,20 @@ function renderCreateOrderPage() {
     <div class="bg-white p-6 rounded-lg shadow">
       <h2 class="text-2xl font-bold mb-6">오더 입력</h2>
       
-      <div class="mb-6">
-        <label class="block mb-2 font-semibold">오더 타입</label>
-        <select id="newOrderType" class="w-full px-3 py-2 border rounded">
-          <option value="container_export">컨테이너 수출</option>
-          <option value="container_import">컨테이너 수입</option>
-          <option value="bulk">벌크화물</option>
-          <option value="lcl">LCL</option>
-        </select>
-      </div>
-      
-      <div class="mb-6">
-        <label class="block mb-2 font-semibold">텍스트 붙여넣기 (자동 파싱)</label>
-        <textarea id="orderTextInput" rows="15" 
-                  class="w-full px-3 py-2 border rounded font-mono text-sm"
-                  placeholder="오더 정보를 붙여넣으세요..."></textarea>
-      </div>
-      
-      <div class="flex space-x-4">
-        <button onclick="parseAndPreviewOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-          <i class="fas fa-magic mr-2"></i>파싱 및 미리보기
+      <!-- 입력 방식 선택 탭 -->
+      <div class="flex space-x-2 mb-6 border-b">
+        <button onclick="changeInputMode('text')" id="tab-text" class="px-4 py-2 font-semibold ${state.inputMode === 'text' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}">
+          <i class="fas fa-paste mr-1"></i>텍스트 붙여넣기
         </button>
-        <button onclick="showManualInput()" class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
-          <i class="fas fa-edit mr-2"></i>직접 입력
+        <button onclick="changeInputMode('form')" id="tab-form" class="px-4 py-2 font-semibold ${state.inputMode === 'form' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}">
+          <i class="fas fa-edit mr-1"></i>직접 입력
+        </button>
+        <button onclick="changeInputMode('excel')" id="tab-excel" class="px-4 py-2 font-semibold ${state.inputMode === 'excel' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}">
+          <i class="fas fa-file-excel mr-1"></i>엑셀 업로드
         </button>
       </div>
       
-      <div id="orderPreview" class="mt-6"></div>
+      <div id="inputContent"></div>
     </div>
   `
 }
@@ -785,18 +774,456 @@ function showAddBillingCompanyModal() {
 }
 
 // ============================================
+// 직접 입력 폼 관련 함수
+// ============================================
+
+function changeFormOrderType(type) {
+  state.formOrderType = type
+  renderFormFields()
+}
+
+function renderFormFields() {
+  const container = document.getElementById('formFields')
+  if (!container) return
+  
+  let fieldsHtml = ''
+  
+  if (state.formOrderType === 'container_export') {
+    fieldsHtml = `
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">BKG / SIZE :</label>
+            <input type="text" id="field_bkg" placeholder="HASLK01251101730 / 40HQ" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">청구처 :</label>
+            <input type="text" id="field_billing" placeholder="베스트부품" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">화주 :</label>
+            <input type="text" id="field_shipper" placeholder="베스트부품" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">작업지 :</label>
+            <input type="text" id="field_worksite" placeholder="경기도 김포시 월곶면 갈산리 171-54" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">담당자 / 연락처 :</label>
+            <input type="text" id="field_contact" placeholder="이상로 이사님 / 010-7290-2112" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">작업일시 :</label>
+            <input type="datetime-local" id="field_datetime" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">선사 :</label>
+            <input type="text" id="field_shipping" placeholder="HAS 흥아라인" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">모선 :</label>
+            <input type="text" id="field_vessel" placeholder="SURABAYA VOYAGR / 9011N" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">수출국 :</label>
+            <input type="text" id="field_export" placeholder="BUSAN / VLADIVOSTOK" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">접안일 / 출항일 :</label>
+            <input type="text" id="field_berth" placeholder="11월29일 / 11월29일" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">상차지 / 하차지 :</label>
+            <input type="text" id="field_location" placeholder="인천승진CY / BPT 신선대" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">중량 :</label>
+            <input type="text" id="field_weight" placeholder="ABT.10TON / 계근 必" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">배차 :</label>
+            <input type="text" id="field_dispatch" placeholder="양양운수" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">차량 :</label>
+            <input type="text" id="field_vehicle" placeholder="경기99바1133 / 010-3219-4316" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div>
+          <label class="block mb-1 font-semibold">컨테이너 넘버 / T.W / 씰 넘버 :</label>
+          <input type="text" id="field_container" placeholder="DFSU2964946 / 2,815 KGS / HAL133314" class="w-full px-3 py-2 border rounded">
+        </div>
+        
+        <div>
+          <label class="block mb-1 font-semibold">* 비고 :</label>
+          <textarea id="field_remarks" rows="3" placeholder="비고 내용 입력..." class="w-full px-3 py-2 border rounded"></textarea>
+        </div>
+        
+        <button onclick="submitFormOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <i class="fas fa-save mr-2"></i>오더 생성
+        </button>
+      </div>
+    `
+  } else if (state.formOrderType === 'container_import') {
+    fieldsHtml = `
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">BL :</label>
+            <input type="text" id="field_bl" placeholder="HASLC05251003220" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">컨테이너 넘버 / SIZE :</label>
+            <input type="text" id="field_container_size" placeholder="HLHU8486174 / 40HQ*1" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">청구처 :</label>
+            <input type="text" id="field_billing" placeholder="제이디쉬핑라인" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">화주 :</label>
+            <input type="text" id="field_shipper" placeholder="바스엔" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">작업지 :</label>
+            <input type="text" id="field_worksite" placeholder="인천 서구 원당대로 395-99" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">담당자 / 연락처 :</label>
+            <input type="text" id="field_contact" placeholder="이진완과장님 / 010-9355-8283" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">작업일시 :</label>
+            <input type="datetime-local" id="field_datetime" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">선사 :</label>
+            <input type="text" id="field_shipping" placeholder="HAS 흥아라인" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">모선 :</label>
+            <input type="text" id="field_vessel" placeholder="선명 입력" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">접안일 / 출항일 :</label>
+            <input type="text" id="field_berth" placeholder="11월29일 / 11월29일" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">상차지 / 하차지 :</label>
+            <input type="text" id="field_location" placeholder="ICT / ICT" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block mb-1 font-semibold">DO :</label>
+              <input type="text" id="field_do" placeholder="ㅇ" class="w-full px-3 py-2 border rounded">
+            </div>
+            <div>
+              <label class="block mb-1 font-semibold">면장 :</label>
+              <input type="text" id="field_customs" placeholder="ㅇ" class="w-full px-3 py-2 border rounded">
+            </div>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">배차 :</label>
+            <input type="text" id="field_dispatch" placeholder="로지아이솔루션" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">차량 :</label>
+            <input type="text" id="field_vehicle" placeholder="인천99아8737 / 김경주 기사님 / 010-7455-3430" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div>
+          <label class="block mb-1 font-semibold">* 비고 :</label>
+          <textarea id="field_remarks" rows="3" placeholder="비고 내용 입력..." class="w-full px-3 py-2 border rounded"></textarea>
+        </div>
+        
+        <button onclick="submitFormOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <i class="fas fa-save mr-2"></i>오더 생성
+        </button>
+      </div>
+    `
+  } else {
+    // 벌크화물 또는 LCL
+    fieldsHtml = `
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">NO :</label>
+            <input type="text" id="field_no" placeholder="오더 번호" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">청구처 :</label>
+            <input type="text" id="field_billing" placeholder="청구처명" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">화주 :</label>
+            <input type="text" id="field_shipper" placeholder="화주명" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">선사 :</label>
+            <input type="text" id="field_shipping" placeholder="선사명" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">상차지 :</label>
+            <input type="text" id="field_loading" placeholder="상차지 위치" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">하차지 :</label>
+            <input type="text" id="field_unloading" placeholder="하차지 위치" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">배차 :</label>
+            <input type="text" id="field_dispatch" placeholder="배차업체" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">차량 :</label>
+            <input type="text" id="field_vehicle" placeholder="차량 번호" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">차량정보 :</label>
+            <input type="text" id="field_vehicle_info" placeholder="기사님 정보" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
+        <div>
+          <label class="block mb-1 font-semibold">* 비고 :</label>
+          <textarea id="field_remarks" rows="3" placeholder="비고 내용 입력..." class="w-full px-3 py-2 border rounded"></textarea>
+        </div>
+        
+        <button onclick="submitFormOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <i class="fas fa-save mr-2"></i>오더 생성
+        </button>
+      </div>
+    `
+  }
+  
+  container.innerHTML = fieldsHtml
+}
+
+function submitFormOrder() {
+  alert('폼 제출 기능은 곧 완성됩니다. 입력된 데이터를 검증하고 오더를 생성합니다.')
+}
+
+// ============================================
+// 엑셀 업로드 관련 함수
+// ============================================
+
+async function handleExcelUpload(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  const progressDiv = document.getElementById('uploadProgress')
+  progressDiv.innerHTML = `
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p class="text-gray-600">엑셀 파일 업로드 및 파싱 중...</p>
+    </div>
+  `
+  
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await axios.post('/api/import/excel', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    if (response.data.success) {
+      progressDiv.innerHTML = `
+        <div class="bg-green-50 border border-green-200 rounded p-4">
+          <h3 class="text-lg font-bold text-green-800 mb-2">
+            <i class="fas fa-check-circle mr-2"></i>업로드 성공!
+          </h3>
+          <p class="text-green-700">
+            총 ${response.data.imported}개의 오더가 생성되었습니다.
+          </p>
+          ${response.data.errors > 0 ? `
+            <p class="text-orange-600 mt-2">
+              <i class="fas fa-exclamation-triangle mr-1"></i>
+              ${response.data.errors}개의 오류가 발생했습니다.
+            </p>
+          ` : ''}
+          <button onclick="changePage('orders')" class="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            오더 목록 보기
+          </button>
+        </div>
+      `
+    } else {
+      throw new Error('업로드 실패')
+    }
+  } catch (error) {
+    console.error('업로드 오류:', error)
+    progressDiv.innerHTML = `
+      <div class="bg-red-50 border border-red-200 rounded p-4">
+        <h3 class="text-lg font-bold text-red-800 mb-2">
+          <i class="fas fa-times-circle mr-2"></i>업로드 실패
+        </h3>
+        <p class="text-red-700">${error.response?.data?.error || error.message}</p>
+        <button onclick="changeInputMode('excel')" class="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+          다시 시도
+        </button>
+      </div>
+    `
+  }
+}
+
+// ============================================
 // 이벤트 핸들러
 // ============================================
 
 function changePage(page) {
   state.currentPage = page
+  if (page === 'create-order') {
+    state.inputMode = 'text'  // 오더 입력 페이지 진입 시 텍스트 모드로 초기화
+  }
   render()
   
   if (page === 'orders') {
     fetchOrders()
   } else if (page === 'todos') {
     fetchTodos()
+  } else if (page === 'create-order') {
+    renderInputContent()
   }
+}
+
+function changeInputMode(mode) {
+  state.inputMode = mode
+  renderInputContent()
+}
+
+function renderInputContent() {
+  const container = document.getElementById('inputContent')
+  if (!container) return
+  
+  if (state.inputMode === 'text') {
+    container.innerHTML = renderTextInputMode()
+  } else if (state.inputMode === 'form') {
+    container.innerHTML = renderFormInputMode()
+    setTimeout(() => renderFormFields(), 0)  // 폼 필드 렌더링
+  } else if (state.inputMode === 'excel') {
+    container.innerHTML = renderExcelInputMode()
+  }
+  
+  // 탭 활성화 표시 업데이트
+  document.querySelectorAll('[id^="tab-"]').forEach(tab => {
+    tab.className = tab.id === `tab-${state.inputMode}` 
+      ? 'px-4 py-2 font-semibold border-b-2 border-blue-500 text-blue-600'
+      : 'px-4 py-2 font-semibold text-gray-600'
+  })
+}
+
+function renderTextInputMode() {
+  return `
+    <div class="mb-6">
+      <label class="block mb-2 font-semibold">오더 타입</label>
+      <select id="newOrderType" class="w-full px-3 py-2 border rounded">
+        <option value="container_export">컨테이너 수출</option>
+        <option value="container_import">컨테이너 수입</option>
+        <option value="bulk">벌크화물</option>
+        <option value="lcl">LCL</option>
+      </select>
+    </div>
+    
+    <div class="mb-6">
+      <label class="block mb-2 font-semibold">텍스트 붙여넣기 (자동 파싱)</label>
+      <textarea id="orderTextInput" rows="15" 
+                class="w-full px-3 py-2 border rounded font-mono text-sm"
+                placeholder="오더 정보를 붙여넣으세요..."></textarea>
+    </div>
+    
+    <div class="flex space-x-4">
+      <button onclick="parseAndPreviewOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+        <i class="fas fa-magic mr-2"></i>파싱 및 미리보기
+      </button>
+    </div>
+    
+    <div id="orderPreview" class="mt-6"></div>
+  `
+}
+
+function renderFormInputMode() {
+  return `
+    <div class="mb-6">
+      <label class="block mb-2 font-semibold">오더 타입 선택</label>
+      <select id="formOrderType" onchange="changeFormOrderType(this.value)" class="w-full px-3 py-2 border rounded">
+        <option value="container_export" ${state.formOrderType === 'container_export' ? 'selected' : ''}>컨테이너 수출</option>
+        <option value="container_import" ${state.formOrderType === 'container_import' ? 'selected' : ''}>컨테이너 수입</option>
+        <option value="bulk" ${state.formOrderType === 'bulk' ? 'selected' : ''}>벌크화물</option>
+        <option value="lcl" ${state.formOrderType === 'lcl' ? 'selected' : ''}>LCL</option>
+      </select>
+    </div>
+    
+    <div id="formFields"></div>
+  `
+}
+
+function renderExcelInputMode() {
+  return `
+    <div class="text-center py-8">
+      <div class="mb-6">
+        <i class="fas fa-file-excel text-6xl text-green-600 mb-4"></i>
+        <h3 class="text-xl font-bold mb-2">엑셀 파일 업로드</h3>
+        <p class="text-gray-600 mb-4">오더 정보가 포함된 엑셀 파일을 업로드하세요.</p>
+        <p class="text-sm text-gray-500">지원 형식: .xlsx, .xls</p>
+      </div>
+      
+      <div class="max-w-md mx-auto">
+        <input type="file" id="excelFileInput" accept=".xlsx,.xls" class="hidden" onchange="handleExcelUpload(event)">
+        <button onclick="document.getElementById('excelFileInput').click()" 
+                class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-lg">
+          <i class="fas fa-upload mr-2"></i>파일 선택
+        </button>
+      </div>
+      
+      <div id="uploadProgress" class="mt-6"></div>
+    </div>
+  `
 }
 
 function changeView(view) {
@@ -982,6 +1409,7 @@ function render() {
     `
   } else if (state.currentPage === 'create-order') {
     content = renderCreateOrderPage()
+    setTimeout(() => renderInputContent(), 0)  // 렌더링 후 내용 채우기
   } else if (state.currentPage === 'todos') {
     content = `<div id="todoContainer"></div>`
   } else if (state.currentPage === 'codes') {

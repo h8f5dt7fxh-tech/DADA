@@ -684,6 +684,187 @@ app.get('/api/export/excel', async (c) => {
 })
 
 // ============================================
+// API Routes - 엑셀 업로드 (오더 일괄 등록)
+// ============================================
+
+app.post('/api/import/excel', async (c) => {
+  const { env } = c
+  
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    
+    if (!file) {
+      return c.json({ error: '파일이 없습니다' }, 400)
+    }
+    
+    // 파일을 ArrayBuffer로 읽기
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = new Uint8Array(arrayBuffer)
+    
+    // XLSX 파싱 (동적 import 사용)
+    const XLSX = await import('xlsx')
+    const workbook = XLSX.read(buffer, { type: 'array' })
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
+    
+    const importedOrders = []
+    const errors = []
+    
+    // 첫 번째 행은 헤더이므로 건너뛰기
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i]
+      
+      // A열이 비어있으면 건너뛰기
+      if (!row[0]) continue
+      
+      try {
+        // 오더 타입 판단
+        const typeStr = String(row[0] || '').trim()
+        let orderType = 'bulk'
+        
+        if (typeStr.includes('수출')) {
+          orderType = 'container_export'
+        } else if (typeStr.includes('수입')) {
+          orderType = 'container_import'
+        } else if (typeStr.toUpperCase().includes('LCL')) {
+          orderType = 'lcl'
+        }
+        
+        // 오더 데이터 구성
+        const orderData: any = {
+          order_type: orderType,
+          work_datetime: row[2] || '',  // C: 작업일
+          billing_company: row[3] || '',  // D: 청구처
+          shipper: row[4] || '',  // E: 화주
+          work_site_code: row[5] || '',  // F: 작업지코드
+          work_site: row[6] || '',  // G: 작업지
+          container_size: row[7] || '',  // H: 컨테이너사이즈
+          loading_location: row[8] || '',  // I: 상차지
+          loading_location_code: row[9] || '',  // J: 상차지 코드
+          unloading_location: row[10] || '',  // K: 하차지
+          unloading_location_code: row[11] || '',  // L: 하차지 코드
+          shipping_line: row[12] || '',  // M: 선사
+          shipping_line_code: row[13] || '',  // N: 선사코드
+          vessel_name: row[14] || '',  // O: 선명
+          berth_date: row[15] || '',  // P: 접안일
+          container_number: row[16] || '',  // Q: 컨테이너 넘버
+          seal_number: row[17] || '',  // R: 씰넘버
+          dispatch_company: row[18] || '',  // S: 배차업체
+          vehicle_info: row[19] || '',  // T: 차량정보
+          contact_person: row[25] || '',  // Z: 담당자
+          status: 'pending',
+          weighing_required: 0,
+          remarks: []
+        }
+        
+        // Y열: BKG/BL/NO
+        if (row[24]) {
+          const bkgBlNo = String(row[24])
+          if (orderType === 'container_export') {
+            orderData.booking_number = bkgBlNo
+          } else if (orderType === 'container_import') {
+            orderData.bl_number = bkgBlNo
+          } else {
+            orderData.order_no = bkgBlNo
+          }
+        }
+        
+        // AB열: 비고
+        if (row[27]) {
+          const remarkContent = String(row[27]).trim()
+          if (remarkContent) {
+            orderData.remarks.push({
+              content: remarkContent,
+              importance: 1
+            })
+          }
+        }
+        
+        // 청구/하불
+        orderData.billings = []
+        orderData.payments = []
+        
+        if (row[21]) {  // V: 청구금액
+          orderData.billings.push({
+            amount: parseFloat(String(row[21])) || 0,
+            description: ''
+          })
+        }
+        
+        if (row[22]) {  // W: 하불금액
+          orderData.payments.push({
+            amount: parseFloat(String(row[22])) || 0,
+            description: ''
+          })
+        }
+        
+        // 오더 삽입
+        const result = await env.DB.prepare(`
+          INSERT INTO transport_orders (
+            order_type, billing_company, shipper, work_site, work_site_code,
+            contact_person, contact_phone, work_datetime,
+            booking_number, container_size, shipping_line, vessel_name,
+            export_country, berth_date, departure_date, weight,
+            container_number, tw, seal_number,
+            bl_number, do_status, customs_clearance, order_no,
+            loading_location, loading_location_code,
+            unloading_location, unloading_location_code,
+            dispatch_company, vehicle_info, status, weighing_required
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          orderData.order_type, orderData.billing_company, orderData.shipper, 
+          orderData.work_site, orderData.work_site_code,
+          orderData.contact_person, '', orderData.work_datetime,
+          orderData.booking_number, orderData.container_size, orderData.shipping_line, 
+          orderData.vessel_name, '', orderData.berth_date, '', '',
+          orderData.container_number, '', orderData.seal_number,
+          orderData.bl_number, '', '', orderData.order_no,
+          orderData.loading_location, orderData.loading_location_code,
+          orderData.unloading_location, orderData.unloading_location_code,
+          orderData.dispatch_company, orderData.vehicle_info, 
+          orderData.status, orderData.weighing_required
+        ).run()
+        
+        const orderId = result.meta.last_row_id
+        
+        // 비고 삽입
+        for (const remark of orderData.remarks) {
+          await env.DB.prepare('INSERT INTO order_remarks (order_id, content, importance) VALUES (?, ?, ?)')
+            .bind(orderId, remark.content, remark.importance).run()
+        }
+        
+        // 청구 삽입
+        for (const billing of orderData.billings) {
+          await env.DB.prepare('INSERT INTO billings (order_id, amount, description) VALUES (?, ?, ?)')
+            .bind(orderId, billing.amount, billing.description).run()
+        }
+        
+        // 하불 삽입
+        for (const payment of orderData.payments) {
+          await env.DB.prepare('INSERT INTO payments (order_id, amount, description) VALUES (?, ?, ?)')
+            .bind(orderId, payment.amount, payment.description).run()
+        }
+        
+        importedOrders.push({ row: i + 1, id: orderId })
+      } catch (error: any) {
+        errors.push({ row: i + 1, error: error.message })
+      }
+    }
+    
+    return c.json({
+      success: true,
+      imported: importedOrders.length,
+      errors: errors.length,
+      details: { importedOrders, errors }
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// ============================================
 // 메인 페이지
 // ============================================
 
