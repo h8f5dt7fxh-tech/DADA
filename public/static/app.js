@@ -518,9 +518,12 @@ async function fetchTodos() {
   }
 }
 
-async function createTodo(content) {
+async function createTodo(content, orderId = null) {
   try {
-    await axios.post('/api/todos', { content })
+    await axios.post('/api/todos', { 
+      content,
+      order_id: orderId 
+    })
     fetchTodos()
   } catch (error) {
     console.error('할일 생성 실패:', error)
@@ -803,19 +806,32 @@ function renderCreateOrderPage() {
 }
 
 function renderTodoList() {
-  const todosHtml = state.todos.map(todo => `
-    <li class="flex items-center justify-between p-3 border-b hover:bg-gray-50">
-      <div class="flex items-center flex-1">
-        <input type="checkbox" ${todo.completed ? 'checked' : ''} 
-               onchange="toggleTodo(${todo.id}, this.checked)"
-               class="mr-3">
-        <span class="${todo.completed ? 'line-through text-gray-400' : ''}">${todo.content}</span>
-      </div>
-      <button onclick="deleteTodo(${todo.id})" class="text-red-600 hover:text-red-800">
-        <i class="fas fa-trash"></i>
-      </button>
-    </li>
-  `).join('')
+  const todosHtml = state.todos.map(todo => {
+    // 오더 연결 정보 표시
+    const orderInfo = todo.order_id ? `
+      <span class="text-xs text-blue-600 ml-2 cursor-pointer hover:underline" 
+            onclick="goToOrderFromTodo(${todo.order_id})">
+        <i class="fas fa-link"></i> 오더 #${todo.order_id}
+      </span>
+    ` : ''
+    
+    return `
+      <li class="flex items-center justify-between p-3 border-b hover:bg-gray-50">
+        <div class="flex items-center flex-1">
+          <input type="checkbox" ${todo.completed ? 'checked' : ''} 
+                 onchange="toggleTodo(${todo.id}, this.checked)"
+                 class="mr-3">
+          <div class="flex-1">
+            <span class="${todo.completed ? 'line-through text-gray-400' : ''}">${todo.content}</span>
+            ${orderInfo}
+          </div>
+        </div>
+        <button onclick="deleteTodo(${todo.id})" class="text-red-600 hover:text-red-800">
+          <i class="fas fa-trash"></i>
+        </button>
+      </li>
+    `
+  }).join('')
   
   const todoContainer = document.getElementById('todoContainer')
   if (todoContainer) {
@@ -825,8 +841,17 @@ function renderTodoList() {
         <div class="mb-4">
           <input type="text" id="newTodoInput" 
                  placeholder="할일 입력..." 
-                 class="w-full px-3 py-2 border rounded"
+                 class="w-full px-3 py-2 border rounded mb-2"
                  onkeypress="if(event.key==='Enter') addTodo()">
+          <div class="flex items-center space-x-2">
+            <input type="number" id="linkedOrderId" 
+                   placeholder="연결할 오더 ID (선택)" 
+                   class="flex-1 px-3 py-2 border rounded text-sm">
+            <button onclick="addTodo()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <i class="fas fa-plus mr-1"></i>추가
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">💡 오더 상세에서 "할일 추가" 버튼을 사용하면 자동으로 연결됩니다</p>
         </div>
         <ul>
           ${todosHtml || '<li class="p-3 text-center text-gray-500">할일이 없습니다</li>'}
@@ -1566,6 +1591,10 @@ function viewOrderDetail(id) {
                 class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
           <i class="fas fa-copy mr-1"></i>배차 복사
         </button>
+        <button onclick="addTodoForOrder(${order.id})" 
+                class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+          <i class="fas fa-tasks mr-1"></i>할일 추가
+        </button>
         <button onclick="editOrder(${order.id})" 
                 class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
           <i class="fas fa-edit mr-1"></i>수정
@@ -1884,11 +1913,14 @@ async function deletePayment(paymentId) {
 
 function addTodo() {
   const input = document.getElementById('newTodoInput')
+  const orderIdInput = document.getElementById('linkedOrderId')
   const content = input.value.trim()
+  const orderId = orderIdInput ? parseInt(orderIdInput.value) : null
   
   if (content) {
-    createTodo(content)
+    createTodo(content, orderId)
     input.value = ''
+    if (orderIdInput) orderIdInput.value = ''
   }
 }
 
@@ -1985,6 +2017,40 @@ async function deleteRemark(remarkId, orderId) {
     console.error('비고 삭제 실패:', error)
     alert('비고 삭제에 실패했습니다.')
   }
+}
+
+// ============================================
+// 할일-오더 연결 함수
+// ============================================
+
+async function addTodoForOrder(orderId) {
+  const order = state.orders.find(o => o.id === orderId)
+  if (!order) return
+  
+  const content = prompt(`오더 #${orderId} (${order.shipper})에 대한 할일을 입력하세요:`)
+  if (!content || content.trim() === '') return
+  
+  try {
+    await createTodo(content.trim(), orderId)
+    alert('할일이 추가되었습니다. 할일 탭에서 확인하세요.')
+  } catch (error) {
+    console.error('할일 추가 실패:', error)
+    alert('할일 추가에 실패했습니다.')
+  }
+}
+
+function goToOrderFromTodo(orderId) {
+  // 오더 관리 페이지로 이동
+  state.currentPage = 'orders'
+  render()
+  
+  // 오더 목록 로드 후 상세 보기
+  fetchOrders().then(() => {
+    // 약간의 딜레이 후 상세 모달 열기
+    setTimeout(() => {
+      viewOrderDetail(orderId)
+    }, 100)
+  })
 }
 
 // ============================================

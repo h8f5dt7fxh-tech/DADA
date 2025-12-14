@@ -524,10 +524,10 @@ app.get('/api/todos', async (c) => {
 
 app.post('/api/todos', async (c) => {
   const { env } = c
-  const { content } = await c.req.json()
+  const { content, order_id } = await c.req.json()
   
-  const result = await env.DB.prepare('INSERT INTO todos (content) VALUES (?)')
-    .bind(content).run()
+  const result = await env.DB.prepare('INSERT INTO todos (content, order_id) VALUES (?, ?)')
+    .bind(content, order_id || null).run()
   
   return c.json({ id: result.meta.last_row_id })
 })
@@ -883,7 +883,7 @@ app.post('/api/import/excel', async (c) => {
           berth_date: row[15] || '',  // P: 접안일
           container_number: containerNumber,
           seal_number: row[17] || '',  // R: 씰넘버
-          dispatch_company: row[18] || '',  // S: 배차업체
+          dispatch_company: row[20] || row[18] || '',  // U(20) 또는 S(18): 배차업체
           vehicle_info: row[19] || '',  // T: 차량정보
           contact_person: row[25] || '',  // Z: 담당자
           status: 'pending',
@@ -1000,6 +1000,42 @@ app.post('/api/import/excel', async (c) => {
       imported: importedOrders.length,
       errors: errors.length,
       details: { importedOrders, errors }
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// ============================================
+// 데이터베이스 관리 API
+// ============================================
+
+// DB 초기화 (오더 데이터만 삭제)
+app.delete('/api/admin/reset-orders', async (c) => {
+  const { env } = c
+  const authKey = c.req.header('X-Admin-Key')
+  
+  // 간단한 보안 체크 (실제로는 환경변수로 관리해야 함)
+  if (authKey !== 'reset-transport-db-2024') {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    // 외래 키 제약 비활성화
+    await env.DB.prepare('PRAGMA foreign_keys = OFF').run()
+    
+    // 오더 관련 테이블 데이터 삭제
+    await env.DB.prepare('DELETE FROM billings').run()
+    await env.DB.prepare('DELETE FROM payments').run()
+    await env.DB.prepare('DELETE FROM order_remarks').run()
+    await env.DB.prepare('DELETE FROM transport_orders').run()
+    
+    // 외래 키 제약 다시 활성화
+    await env.DB.prepare('PRAGMA foreign_keys = ON').run()
+    
+    return c.json({ 
+      success: true, 
+      message: '오더 데이터가 모두 삭제되었습니다.' 
     })
   } catch (error: any) {
     return c.json({ error: error.message }, 500)
