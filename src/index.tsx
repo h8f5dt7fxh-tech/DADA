@@ -65,24 +65,51 @@ app.get('/api/orders', async (c) => {
   const stmt = env.DB.prepare(query).bind(...params)
   const { results } = await stmt.all()
   
-  // 각 오더에 대한 비고, 청구, 하불 정보 가져오기
-  const ordersWithDetails = await Promise.all(
-    results.map(async (order: any) => {
-      const remarks = await env.DB.prepare('SELECT * FROM order_remarks WHERE order_id = ? ORDER BY created_at ASC')
-        .bind(order.id).all()
-      const billings = await env.DB.prepare('SELECT * FROM billings WHERE order_id = ?')
-        .bind(order.id).all()
-      const payments = await env.DB.prepare('SELECT * FROM payments WHERE order_id = ?')
-        .bind(order.id).all()
-      
-      return {
-        ...order,
-        remarks: remarks.results,
-        billings: billings.results,
-        payments: payments.results
-      }
-    })
-  )
+  // 성능 최적화: 모든 오더의 ID를 한 번에 조회
+  if (results.length === 0) {
+    return c.json([])
+  }
+  
+  const orderIds = results.map((order: any) => order.id)
+  const idsPlaceholder = orderIds.map(() => '?').join(',')
+  
+  // 비고, 청구, 하불 정보를 한 번의 쿼리로 가져오기
+  const [remarksRes, billingsRes, paymentsRes] = await Promise.all([
+    env.DB.prepare(`SELECT * FROM order_remarks WHERE order_id IN (${idsPlaceholder}) ORDER BY created_at ASC`)
+      .bind(...orderIds).all(),
+    env.DB.prepare(`SELECT * FROM billings WHERE order_id IN (${idsPlaceholder})`)
+      .bind(...orderIds).all(),
+    env.DB.prepare(`SELECT * FROM payments WHERE order_id IN (${idsPlaceholder})`)
+      .bind(...orderIds).all()
+  ])
+  
+  // order_id로 그룹핑
+  const remarksByOrderId: any = {}
+  const billingsByOrderId: any = {}
+  const paymentsByOrderId: any = {}
+  
+  remarksRes.results.forEach((r: any) => {
+    if (!remarksByOrderId[r.order_id]) remarksByOrderId[r.order_id] = []
+    remarksByOrderId[r.order_id].push(r)
+  })
+  
+  billingsRes.results.forEach((b: any) => {
+    if (!billingsByOrderId[b.order_id]) billingsByOrderId[b.order_id] = []
+    billingsByOrderId[b.order_id].push(b)
+  })
+  
+  paymentsRes.results.forEach((p: any) => {
+    if (!paymentsByOrderId[p.order_id]) paymentsByOrderId[p.order_id] = []
+    paymentsByOrderId[p.order_id].push(p)
+  })
+  
+  // 각 오더에 상세 정보 추가
+  const ordersWithDetails = results.map((order: any) => ({
+    ...order,
+    remarks: remarksByOrderId[order.id] || [],
+    billings: billingsByOrderId[order.id] || [],
+    payments: paymentsByOrderId[order.id] || []
+  }))
   
   return c.json(ordersWithDetails)
 })
