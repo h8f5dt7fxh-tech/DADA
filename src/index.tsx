@@ -75,15 +75,47 @@ app.get('/api/orders', async (c) => {
   const includeDetails = view === 'day' || (search && search.length >= 2)
   
   if (!includeDetails) {
-    // 간단한 버전: billings/payments 없이 오더만 반환
-    const ordersSimple = results.map((order: any) => ({
+    // 간단한 집계 정보만 추가 (청구/하불 합계)
+    const orderIds = results.map((order: any) => order.id)
+    
+    // 청구/하불 합계를 한 번에 조회
+    const billingsQuery = `
+      SELECT order_id, SUM(amount) as total 
+      FROM billings 
+      WHERE order_id IN (SELECT id FROM transport_orders WHERE strftime('%Y-%m', work_datetime) = ?)
+      GROUP BY order_id
+    `
+    const paymentsQuery = `
+      SELECT order_id, SUM(amount) as total 
+      FROM payments 
+      WHERE order_id IN (SELECT id FROM transport_orders WHERE strftime('%Y-%m', work_datetime) = ?)
+      GROUP BY order_id
+    `
+    
+    const [billingsRes, paymentsRes] = await Promise.all([
+      env.DB.prepare(billingsQuery).bind(date).all(),
+      env.DB.prepare(paymentsQuery).bind(date).all()
+    ])
+    
+    const billingTotals: any = {}
+    const paymentTotals: any = {}
+    
+    billingsRes.results.forEach((b: any) => {
+      billingTotals[b.order_id] = b.total || 0
+    })
+    
+    paymentsRes.results.forEach((p: any) => {
+      paymentTotals[p.order_id] = p.total || 0
+    })
+    
+    const ordersWithTotals = results.map((order: any) => ({
       ...order,
       remarks: [],
-      billings: [],
-      payments: []
+      billings: [{ amount: billingTotals[order.id] || 0 }],
+      payments: [{ amount: paymentTotals[order.id] || 0 }]
     }))
     
-    return c.json(ordersSimple)
+    return c.json(ordersWithTotals)
   }
   
   // 일별 조회: 상세 정보 포함
