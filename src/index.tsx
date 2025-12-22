@@ -23,8 +23,9 @@ app.get('/api/orders', async (c) => {
   const { env } = c
   const { view = 'day', date, search, type } = c.req.query()
   
-  let query = 'SELECT * FROM transport_orders WHERE 1=1'
-  const params: any[] = []
+  try {
+    let query = 'SELECT * FROM transport_orders WHERE 1=1'
+    const params: any[] = []
   
   // 타입 필터
   if (type && type !== 'all') {
@@ -74,49 +75,23 @@ app.get('/api/orders', async (c) => {
   const includeDetails = view === 'day' || (search && search.length >= 2)
   
   if (!includeDetails) {
-    // 간단한 집계 정보만 추가 (청구/하불 합계)
-    const orderIds = results.map((order: any) => order.id)
-    
-    // SQLite 변수 제한 (999개) 회피: 배치 처리
-    const batchSize = 500
-    const billingTotals: any = {}
-    const paymentTotals: any = {}
-    
-    for (let i = 0; i < orderIds.length; i += batchSize) {
-      const batch = orderIds.slice(i, i + batchSize)
-      const idsPlaceholder = batch.map(() => '?').join(',')
-      
-      const [billingsRes, paymentsRes] = await Promise.all([
-        env.DB.prepare(`SELECT order_id, SUM(amount) as total FROM billings WHERE order_id IN (${idsPlaceholder}) GROUP BY order_id`)
-          .bind(...batch).all(),
-        env.DB.prepare(`SELECT order_id, SUM(amount) as total FROM payments WHERE order_id IN (${idsPlaceholder}) GROUP BY order_id`)
-          .bind(...batch).all()
-      ])
-      
-      billingsRes.results.forEach((b: any) => {
-        billingTotals[b.order_id] = b.total || 0
-      })
-      
-      paymentsRes.results.forEach((p: any) => {
-        paymentTotals[p.order_id] = p.total || 0
-      })
-    }
-    
-    const ordersWithTotals = results.map((order: any) => ({
+    // 간단한 버전: billings/payments 없이 오더만 반환
+    const ordersSimple = results.map((order: any) => ({
       ...order,
       remarks: [],
-      billings: [{ amount: billingTotals[order.id] || 0 }],
-      payments: [{ amount: paymentTotals[order.id] || 0 }]
+      billings: [],
+      payments: []
     }))
     
-    return c.json(ordersWithTotals)
+    return c.json(ordersSimple)
   }
   
   // 일별 조회: 상세 정보 포함
   const orderIds = results.map((order: any) => order.id)
   
   // SQLite 변수 제한 (999개) 회피: 배치 처리
-  const batchSize = 500
+  // Cloudflare D1 실제 제한을 고려하여 작은 배치 사용
+  const batchSize = 200
   let allRemarks: any[] = []
   let allBillings: any[] = []
   let allPayments: any[] = []
@@ -125,14 +100,13 @@ app.get('/api/orders', async (c) => {
     const batch = orderIds.slice(i, i + batchSize)
     const idsPlaceholder = batch.map(() => '?').join(',')
     
-    const [remarksRes, billingsRes, paymentsRes] = await Promise.all([
-      env.DB.prepare(`SELECT * FROM order_remarks WHERE order_id IN (${idsPlaceholder}) ORDER BY created_at ASC`)
-        .bind(...batch).all(),
-      env.DB.prepare(`SELECT * FROM billings WHERE order_id IN (${idsPlaceholder})`)
-        .bind(...batch).all(),
-      env.DB.prepare(`SELECT * FROM payments WHERE order_id IN (${idsPlaceholder})`)
-        .bind(...batch).all()
-    ])
+    // 순차 실행으로 변경하여 변수 제한 회피
+    const remarksRes = await env.DB.prepare(`SELECT * FROM order_remarks WHERE order_id IN (${idsPlaceholder}) ORDER BY created_at ASC`)
+      .bind(...batch).all()
+    const billingsRes = await env.DB.prepare(`SELECT * FROM billings WHERE order_id IN (${idsPlaceholder})`)
+      .bind(...batch).all()
+    const paymentsRes = await env.DB.prepare(`SELECT * FROM payments WHERE order_id IN (${idsPlaceholder})`)
+      .bind(...batch).all()
     
     allRemarks = allRemarks.concat(remarksRes.results)
     allBillings = allBillings.concat(billingsRes.results)
@@ -170,6 +144,14 @@ app.get('/api/orders', async (c) => {
   }))
   
   return c.json(ordersWithDetails)
+  } catch (error: any) {
+    console.error('Orders API Error:', error)
+    return c.json({ 
+      error: error.message || 'Internal Server Error',
+      stack: error.stack,
+      details: `View: ${view}, Date: ${date}, Search: ${search}, Type: ${type}`
+    }, 500)
+  }
 })
 
 // 오더 상세 조회
