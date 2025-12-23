@@ -233,24 +233,11 @@ app.get('/api/orders/:id', async (c) => {
 // 오더 생성
 app.post('/api/orders', async (c) => {
   const { env } = c
-  const body = await c.req.json()
   
-  const {
-    order_type, billing_company, shipper, work_site, work_site_code,
-    contact_person, contact_phone, work_datetime,
-    booking_number, container_size, shipping_line, vessel_name,
-    export_country, berth_date, departure_date, weight,
-    container_number, tw, seal_number,
-    bl_number, do_status, customs_clearance, order_no,
-    loading_location, loading_location_code,
-    unloading_location, unloading_location_code,
-    dispatch_company, vehicle_info, status, weighing_required,
-    remarks, billings, payments
-  } = body
-  
-  // 오더 삽입
-  const result = await env.DB.prepare(`
-    INSERT INTO transport_orders (
+  try {
+    const body = await c.req.json()
+    
+    const {
       order_type, billing_company, shipper, work_site, work_site_code,
       contact_person, contact_phone, work_datetime,
       booking_number, container_size, shipping_line, vessel_name,
@@ -259,47 +246,69 @@ app.post('/api/orders', async (c) => {
       bl_number, do_status, customs_clearance, order_no,
       loading_location, loading_location_code,
       unloading_location, unloading_location_code,
-      dispatch_company, vehicle_info, status, weighing_required
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    order_type, billing_company, shipper, work_site, work_site_code,
-    contact_person, contact_phone, work_datetime,
-    booking_number, container_size, shipping_line, vessel_name,
-    export_country, berth_date, departure_date, weight,
-    container_number, tw, seal_number,
-    bl_number, do_status, customs_clearance, order_no,
-    loading_location, loading_location_code,
-    unloading_location, unloading_location_code,
-    dispatch_company, vehicle_info, status || 'pending', weighing_required || 0
-  ).run()
-  
-  const orderId = result.meta.last_row_id
-  
-  // 비고 삽입
-  if (remarks && Array.isArray(remarks)) {
-    for (const remark of remarks) {
-      await env.DB.prepare('INSERT INTO order_remarks (order_id, content, importance) VALUES (?, ?, ?)')
-        .bind(orderId, remark.content, remark.importance || 0).run()
+      dispatch_company, vehicle_info, status, weighing_required,
+      remarks, billings, payments
+    } = body
+    
+    // 오더 삽입
+    const result = await env.DB.prepare(`
+      INSERT INTO transport_orders (
+        order_type, billing_company, shipper, work_site, work_site_code,
+        contact_person, contact_phone, work_datetime,
+        booking_number, container_size, shipping_line, vessel_name,
+        export_country, berth_date, departure_date, weight,
+        container_number, tw, seal_number,
+        bl_number, do_status, customs_clearance, order_no,
+        loading_location, loading_location_code,
+        unloading_location, unloading_location_code,
+        dispatch_company, vehicle_info, status, weighing_required
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      order_type, billing_company, shipper, work_site, work_site_code || null,
+      contact_person || null, contact_phone || null, work_datetime,
+      booking_number || null, container_size || null, shipping_line || null, vessel_name || null,
+      export_country || null, berth_date || null, departure_date || null, weight || null,
+      container_number || null, tw || null, seal_number || null,
+      bl_number || null, do_status || null, customs_clearance || null, order_no || null,
+      loading_location || null, loading_location_code || null,
+      unloading_location || null, unloading_location_code || null,
+      dispatch_company || null, vehicle_info || null, status || 'pending', weighing_required || 0
+    ).run()
+    
+    const orderId = result.meta.last_row_id
+    
+    // 비고 삽입
+    if (remarks && Array.isArray(remarks)) {
+      for (const remark of remarks) {
+        await env.DB.prepare('INSERT INTO order_remarks (order_id, content, importance) VALUES (?, ?, ?)')
+          .bind(orderId, remark.content, remark.importance || 0).run()
+      }
     }
-  }
-  
-  // 청구 삽입
-  if (billings && Array.isArray(billings)) {
-    for (const billing of billings) {
-      await env.DB.prepare('INSERT INTO billings (order_id, amount, description) VALUES (?, ?, ?)')
-        .bind(orderId, billing.amount, billing.description || '').run()
+    
+    // 청구 삽입
+    if (billings && Array.isArray(billings)) {
+      for (const billing of billings) {
+        await env.DB.prepare('INSERT INTO billings (order_id, amount, description) VALUES (?, ?, ?)')
+          .bind(orderId, billing.amount, billing.description || '').run()
+      }
     }
-  }
-  
-  // 하불 삽입
-  if (payments && Array.isArray(payments)) {
-    for (const payment of payments) {
-      await env.DB.prepare('INSERT INTO payments (order_id, amount, description) VALUES (?, ?, ?)')
-        .bind(orderId, payment.amount, payment.description || '').run()
+    
+    // 하불 삽입
+    if (payments && Array.isArray(payments)) {
+      for (const payment of payments) {
+        await env.DB.prepare('INSERT INTO payments (order_id, amount, description) VALUES (?, ?, ?)')
+          .bind(orderId, payment.amount, payment.description || '').run()
+      }
     }
+    
+    return c.json({ id: orderId, message: '오더가 생성되었습니다' })
+  } catch (error: any) {
+    console.error('Create Order Error:', error)
+    return c.json({ 
+      error: error.message || 'Internal Server Error',
+      stack: error.stack
+    }, 500)
   }
-  
-  return c.json({ id: orderId, message: '오더가 생성되었습니다' })
 })
 
 // 오더 수정
