@@ -1806,6 +1806,15 @@ function renderFormFields() {
         <div>
           <label class="block mb-1 font-semibold">* 비고 :</label>
           <textarea id="field_remarks" rows="3" placeholder="비고 내용 입력..." class="w-full px-3 py-2 border rounded"></textarea>
+          <div class="mt-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">중요도:</label>
+            <select id="field_remarks_importance" class="w-full px-3 py-2 border rounded">
+              <option value="0">🟢 낮음 (Low)</option>
+              <option value="1" selected>🟡 보통 (Medium)</option>
+              <option value="2">🔴 높음 (High)</option>
+              <option value="3">🔥 긴급 (Urgent)</option>
+            </select>
+          </div>
         </div>
         
         <button onclick="submitFormOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
@@ -1902,6 +1911,15 @@ function renderFormFields() {
         <div>
           <label class="block mb-1 font-semibold">* 비고 :</label>
           <textarea id="field_remarks" rows="3" placeholder="비고 내용 입력..." class="w-full px-3 py-2 border rounded"></textarea>
+          <div class="mt-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">중요도:</label>
+            <select id="field_remarks_importance" class="w-full px-3 py-2 border rounded">
+              <option value="0">🟢 낮음 (Low)</option>
+              <option value="1" selected>🟡 보통 (Medium)</option>
+              <option value="2">🔴 높음 (High)</option>
+              <option value="3">🔥 긴급 (Urgent)</option>
+            </select>
+          </div>
         </div>
         
         <button onclick="submitFormOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
@@ -1964,6 +1982,15 @@ function renderFormFields() {
         <div>
           <label class="block mb-1 font-semibold">* 비고 :</label>
           <textarea id="field_remarks" rows="3" placeholder="비고 내용 입력..." class="w-full px-3 py-2 border rounded"></textarea>
+          <div class="mt-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">중요도:</label>
+            <select id="field_remarks_importance" class="w-full px-3 py-2 border rounded">
+              <option value="0">🟢 낮음 (Low)</option>
+              <option value="1" selected>🟡 보통 (Medium)</option>
+              <option value="2">🔴 높음 (High)</option>
+              <option value="3">🔥 긴급 (Urgent)</option>
+            </select>
+          </div>
         </div>
         
         <button onclick="submitFormOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
@@ -1976,8 +2003,96 @@ function renderFormFields() {
   container.innerHTML = fieldsHtml
 }
 
-function submitFormOrder() {
-  alert('폼 제출 기능은 곧 완성됩니다. 입력된 데이터를 검증하고 오더를 생성합니다.')
+async function submitFormOrder() {
+  try {
+    // 공통 필드
+    const orderType = state.formOrderType
+    const billingCompany = document.getElementById('field_billing_company')?.value
+    const shipper = document.getElementById('field_shipper')?.value
+    const workSite = document.getElementById('field_work_site')?.value
+    const workDatetime = document.getElementById('field_work_datetime')?.value
+    const containerSize = document.getElementById('field_container_size')?.value
+    const loadingLocation = document.getElementById('field_loading_location')?.value
+    const unloadingLocation = document.getElementById('field_unloading_location')?.value
+    const dispatchCompany = document.getElementById('field_dispatch_company')?.value
+    
+    // 선택 필드
+    const bookingNumber = document.getElementById('field_booking_number')?.value
+    const blNumber = document.getElementById('field_bl_number')?.value
+    const shippingLine = document.getElementById('field_shipping_line')?.value
+    const vesselName = document.getElementById('field_vessel_name')?.value
+    const containerInfo = document.getElementById('field_container')?.value
+    
+    // 비고 및 중요도
+    const remarksText = document.getElementById('field_remarks')?.value
+    const remarksImportance = parseInt(document.getElementById('field_remarks_importance')?.value || '1')
+    
+    // 필수 필드 검증
+    if (!billingCompany || !shipper || !workDatetime) {
+      alert('청구처, 화주, 작업일시는 필수 입력 항목입니다.')
+      return
+    }
+    
+    // 컨테이너 정보 파싱 (컨테이너 넘버 / T.W / 씰 넘버)
+    let containerNumber = null
+    let tw = null
+    let sealNumber = null
+    if (containerInfo) {
+      const parts = containerInfo.split('/').map(p => p.trim())
+      containerNumber = parts[0] || null
+      tw = parts[1] || null
+      sealNumber = parts[2] || null
+    }
+    
+    // 오더 데이터 구성
+    const orderData = {
+      order_type: orderType,
+      billing_company: billingCompany,
+      shipper: shipper,
+      work_site: workSite,
+      work_datetime: workDatetime,
+      container_size: containerSize,
+      loading_location: loadingLocation,
+      unloading_location: unloadingLocation,
+      dispatch_company: dispatchCompany,
+      booking_number: bookingNumber,
+      bl_number: blNumber,
+      shipping_line: shippingLine,
+      vessel_name: vesselName,
+      container_number: containerNumber,
+      tw: tw,
+      seal_number: sealNumber,
+      status: 'pending'
+    }
+    
+    // 비고 추가
+    if (remarksText && remarksText.trim()) {
+      orderData.remarks = [{
+        content: remarksText.trim(),
+        importance: remarksImportance
+      }]
+    }
+    
+    // API 호출
+    const response = await axios.post('/api/orders', orderData)
+    
+    if (response.data.id) {
+      alert(`오더가 성공적으로 생성되었습니다! (ID: ${response.data.id})`)
+      
+      // 폼 초기화
+      document.querySelectorAll('input[type="text"], textarea').forEach(input => {
+        input.value = ''
+      })
+      
+      // 오더 목록으로 이동
+      state.activeTab = 'order-list'
+      render()
+      fetchOrders()
+    }
+  } catch (error) {
+    console.error('오더 생성 실패:', error)
+    alert(`오더 생성 실패: ${error.response?.data?.error || error.message}`)
+  }
 }
 
 // ============================================
