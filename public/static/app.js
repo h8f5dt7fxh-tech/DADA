@@ -1964,6 +1964,17 @@ function renderFormFields() {
           </div>
         </div>
         
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1 font-semibold">상차일 (작업일시) :</label>
+            <input type="datetime-local" id="field_loading_datetime" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">하차일 (선택) :</label>
+            <input type="datetime-local" id="field_unloading_datetime" class="w-full px-3 py-2 border rounded">
+          </div>
+        </div>
+        
         <div class="grid grid-cols-3 gap-4">
           <div>
             <label class="block mb-1 font-semibold">배차 :</label>
@@ -2005,33 +2016,69 @@ function renderFormFields() {
 
 async function submitFormOrder() {
   try {
-    // 공통 필드
     const orderType = state.formOrderType
-    const billingCompany = document.getElementById('field_billing_company')?.value
-    const shipper = document.getElementById('field_shipper')?.value
-    const workSite = document.getElementById('field_work_site')?.value
-    const workDatetime = document.getElementById('field_work_datetime')?.value
-    const containerSize = document.getElementById('field_container_size')?.value
-    const loadingLocation = document.getElementById('field_loading_location')?.value
-    const unloadingLocation = document.getElementById('field_unloading_location')?.value
-    const dispatchCompany = document.getElementById('field_dispatch_company')?.value
     
-    // 선택 필드
-    const bookingNumber = document.getElementById('field_booking_number')?.value
-    const blNumber = document.getElementById('field_bl_number')?.value
-    const shippingLine = document.getElementById('field_shipping_line')?.value
-    const vesselName = document.getElementById('field_vessel_name')?.value
-    const containerInfo = document.getElementById('field_container')?.value
+    // LCL/벌크 타입 전용 필드
+    let billingCompany, shipper, shippingLine, loadingLocation, unloadingLocation
+    let loadingDatetime, unloadingDatetime, dispatchCompany, vehicle, vehicleInfo
+    let workDatetime = null
+    
+    // 컨테이너 타입 전용 필드
+    let workSite, containerSize, bookingNumber, blNumber, vesselName, containerInfo
+    
+    if (orderType === 'lcl' || orderType === 'bulk') {
+      // LCL/벌크 폼의 필드 ID
+      billingCompany = document.getElementById('field_billing')?.value
+      shipper = document.getElementById('field_shipper')?.value
+      shippingLine = document.getElementById('field_shipping')?.value
+      loadingLocation = document.getElementById('field_loading')?.value
+      unloadingLocation = document.getElementById('field_unloading')?.value
+      loadingDatetime = document.getElementById('field_loading_datetime')?.value
+      unloadingDatetime = document.getElementById('field_unloading_datetime')?.value
+      dispatchCompany = document.getElementById('field_dispatch')?.value
+      vehicle = document.getElementById('field_vehicle')?.value
+      vehicleInfo = document.getElementById('field_vehicle_info')?.value
+      
+      // 필수 필드 검증 (LCL/벌크)
+      if (!billingCompany || !shipper) {
+        alert('청구처, 화주는 필수 입력 항목입니다.')
+        return
+      }
+      
+      if (!loadingDatetime && !unloadingDatetime) {
+        alert('상차일 또는 하차일 중 최소 하나는 입력해야 합니다.')
+        return
+      }
+      
+      // work_datetime은 상차일을 기본으로 사용 (없으면 하차일)
+      workDatetime = loadingDatetime || unloadingDatetime
+      
+    } else {
+      // 컨테이너 수출/수입 폼의 필드 ID
+      billingCompany = document.getElementById('field_billing_company')?.value
+      shipper = document.getElementById('field_shipper')?.value
+      workSite = document.getElementById('field_work_site')?.value
+      workDatetime = document.getElementById('field_work_datetime')?.value
+      containerSize = document.getElementById('field_container_size')?.value
+      loadingLocation = document.getElementById('field_loading_location')?.value
+      unloadingLocation = document.getElementById('field_unloading_location')?.value
+      dispatchCompany = document.getElementById('field_dispatch_company')?.value
+      bookingNumber = document.getElementById('field_booking_number')?.value
+      blNumber = document.getElementById('field_bl_number')?.value
+      shippingLine = document.getElementById('field_shipping_line')?.value
+      vesselName = document.getElementById('field_vessel_name')?.value
+      containerInfo = document.getElementById('field_container')?.value
+      
+      // 필수 필드 검증 (컨테이너)
+      if (!billingCompany || !shipper || !workDatetime) {
+        alert('청구처, 화주, 작업일시는 필수 입력 항목입니다.')
+        return
+      }
+    }
     
     // 비고 및 중요도
     const remarksText = document.getElementById('field_remarks')?.value
     const remarksImportance = parseInt(document.getElementById('field_remarks_importance')?.value || '1')
-    
-    // 필수 필드 검증
-    if (!billingCompany || !shipper || !workDatetime) {
-      alert('청구처, 화주, 작업일시는 필수 입력 항목입니다.')
-      return
-    }
     
     // 컨테이너 정보 파싱 (컨테이너 넘버 / T.W / 씰 넘버)
     let containerNumber = null
@@ -2062,6 +2109,7 @@ async function submitFormOrder() {
       container_number: containerNumber,
       tw: tw,
       seal_number: sealNumber,
+      vehicle_info: vehicle || vehicleInfo,
       status: 'pending'
     }
     
@@ -2073,6 +2121,32 @@ async function submitFormOrder() {
       }]
     }
     
+    // LCL/벌크 타입에서 상차일/하차일 정보를 비고에 추가
+    if (orderType === 'lcl' || orderType === 'bulk') {
+      const dateInfo = []
+      if (loadingDatetime) {
+        dateInfo.push(`상차일: ${loadingDatetime}`)
+      }
+      if (unloadingDatetime) {
+        dateInfo.push(`하차일: ${unloadingDatetime}`)
+      }
+      
+      if (dateInfo.length > 0) {
+        const dateRemark = dateInfo.join(' / ')
+        if (orderData.remarks) {
+          orderData.remarks.push({
+            content: dateRemark,
+            importance: 1
+          })
+        } else {
+          orderData.remarks = [{
+            content: dateRemark,
+            importance: 1
+          }]
+        }
+      }
+    }
+    
     // API 호출
     const response = await axios.post('/api/orders', orderData)
     
@@ -2080,7 +2154,7 @@ async function submitFormOrder() {
       alert(`오더가 성공적으로 생성되었습니다! (ID: ${response.data.id})`)
       
       // 폼 초기화
-      document.querySelectorAll('input[type="text"], textarea').forEach(input => {
+      document.querySelectorAll('input[type="text"], input[type="datetime-local"], textarea').forEach(input => {
         input.value = ''
       })
       
