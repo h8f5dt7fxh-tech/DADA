@@ -2,7 +2,7 @@
 // 전역 상태 관리
 // ============================================
 const state = {
-  currentPage: 'orders',
+  currentPage: 'create-order',  // 초기 페이지를 오더 입력으로 변경
   currentView: 'month',
   currentDate: dayjs().format('YYYY-MM-DD'), // 현재 날짜로 초기화
   currentOrderType: 'all',
@@ -2150,8 +2150,8 @@ async function submitFormOrder() {
     // API 호출
     const response = await axios.post('/api/orders', orderData)
     
-    if (response.data.id) {
-      alert(`오더가 성공적으로 생성되었습니다! (ID: ${response.data.id})`)
+    if (response.data && response.status === 200) {
+      alert(`오더가 성공적으로 생성되었습니다!${response.data.id ? ' (ID: ' + response.data.id + ')' : ''}`)
       
       // 폼 초기화
       document.querySelectorAll('input[type="text"], input[type="datetime-local"], textarea').forEach(input => {
@@ -2159,7 +2159,7 @@ async function submitFormOrder() {
       })
       
       // 오더 목록으로 이동
-      state.activeTab = 'order-list'
+      state.currentPage = 'orders'
       render()
       fetchOrders()
     }
