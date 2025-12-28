@@ -2284,12 +2284,19 @@ function renderTextInputMode() {
   return `
     <div class="mb-6">
       <label class="block mb-2 font-semibold">오더 타입</label>
-      <select id="newOrderType" class="w-full px-3 py-2 border rounded">
+      <select id="newOrderType" onchange="updateTemplateButton()" class="w-full px-3 py-2 border rounded">
         <option value="container_export">컨테이너 수출</option>
         <option value="container_import">컨테이너 수입</option>
         <option value="bulk">벌크화물</option>
         <option value="lcl">LCL</option>
       </select>
+    </div>
+    
+    <div class="mb-4">
+      <button onclick="copyOrderTemplate()" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center justify-center">
+        <i class="fas fa-copy mr-2"></i>
+        <span id="templateButtonText">컨테이너 수출 양식 복사</span>
+      </button>
     </div>
     
     <div class="mb-6">
@@ -2404,6 +2411,110 @@ function toggleMobileMenu() {
 function changeOrderType(type) {
   state.currentOrderType = type
   fetchOrders()
+}
+
+// 오더 타입별 양식 템플릿
+function getOrderTemplate(orderType) {
+  const templates = {
+    container_export: `BKG / SIZE : 
+청구처 : 
+화주 : 
+작업지 : 
+담당자 / 연락처 : 
+작업일시 : 2025.12.23(월) 08:30
+선사 : 
+모선 : 
+수출국 : 
+접안일 / 출항일 : 
+상차지 / 하차지 : 
+배차 : 
+차량 : 
+특이사항 : `,
+
+    container_import: `BL : 
+컨테이너 넘버 / SIZE : 
+청구처 : 
+화주 : 
+작업지 : 
+담당자 / 연락처 : 
+작업일시 : 2025.12.23(월) 08:30
+선사 : 
+모선 : 
+접안일 / 출항일 : 
+상차지 / 하차지 : 
+DO : 
+면장 : 
+배차 : 
+차량 : 
+특이사항 : `,
+
+    bulk: `청구처 : 
+화주 : 
+선사 : 
+상차지 : 
+하차지 : 
+상차일 : 2025.12.23(월) 08:30
+하차일 : 2025.12.24(화) 14:00
+배차 : 
+차량 : 
+차량정보 : 
+특이사항 : `,
+
+    lcl: `청구처 : 
+화주 : 
+선사 : 
+상차지 : 
+하차지 : 
+상차일 : 2025.12.23(월) 08:30
+하차일 : 2025.12.24(화) 14:00
+배차 : 
+차량 : 
+차량정보 : 
+특이사항 : `
+  }
+  
+  return templates[orderType] || templates.container_export
+}
+
+// 양식 복사 함수
+function copyOrderTemplate() {
+  const orderType = document.getElementById('newOrderType')?.value || 'container_export'
+  const template = getOrderTemplate(orderType)
+  
+  // 클립보드에 복사
+  navigator.clipboard.writeText(template).then(() => {
+    // 성공 메시지
+    const button = event.target.closest('button')
+    const originalText = button.innerHTML
+    
+    button.innerHTML = '<i class="fas fa-check mr-2"></i>복사 완료!'
+    button.className = 'w-full px-4 py-2 bg-green-700 text-white rounded flex items-center justify-center'
+    
+    setTimeout(() => {
+      button.innerHTML = originalText
+      button.className = 'w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center justify-center'
+    }, 2000)
+  }).catch(err => {
+    console.error('복사 실패:', err)
+    alert('복사에 실패했습니다. 브라우저 설정을 확인해주세요.')
+  })
+}
+
+// 템플릿 버튼 텍스트 업데이트
+function updateTemplateButton() {
+  const orderType = document.getElementById('newOrderType')?.value
+  const buttonText = document.getElementById('templateButtonText')
+  
+  if (buttonText) {
+    const typeNames = {
+      container_export: '컨테이너 수출',
+      container_import: '컨테이너 수입',
+      bulk: '벌크화물',
+      lcl: 'LCL'
+    }
+    
+    buttonText.textContent = `${typeNames[orderType] || '컨테이너 수출'} 양식 복사`
+  }
 }
 
 function handleSearch(query) {
