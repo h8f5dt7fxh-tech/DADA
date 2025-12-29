@@ -1273,6 +1273,58 @@ app.get('/api/sales-person/:billingCompany', async (c) => {
   }
 })
 
+// 청구처-영업담당자 전체 목록 조회
+app.get('/api/billing-sales', async (c) => {
+  const { env } = c
+  
+  try {
+    const { results } = await env.DB.prepare(
+      'SELECT * FROM billing_company_sales ORDER BY billing_company ASC'
+    ).all()
+    
+    return c.json(results)
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 청구처-영업담당자 추가/수정
+app.post('/api/billing-sales', async (c) => {
+  const { env } = c
+  
+  try {
+    const { billing_company, sales_person } = await c.req.json()
+    
+    if (!billing_company || !sales_person) {
+      return c.json({ error: '청구처명과 영업담당자는 필수입니다.' }, 400)
+    }
+    
+    await env.DB.prepare(
+      'INSERT OR REPLACE INTO billing_company_sales (billing_company, sales_person, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)'
+    ).bind(billing_company, sales_person).run()
+    
+    return c.json({ success: true, billing_company, sales_person })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 청구처-영업담당자 삭제
+app.delete('/api/billing-sales/:billingCompany', async (c) => {
+  const { env } = c
+  const billingCompany = decodeURIComponent(c.req.param('billingCompany'))
+  
+  try {
+    await env.DB.prepare(
+      'DELETE FROM billing_company_sales WHERE billing_company = ?'
+    ).bind(billingCompany).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // 협력업체 대량 업데이트
 app.post('/api/admin/import-dispatch-companies', async (c) => {
   const { env } = c
