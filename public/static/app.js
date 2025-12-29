@@ -2,9 +2,9 @@
 // 전역 상태 관리
 // ============================================
 const state = {
-  currentPage: 'create-order',  // 초기 페이지를 오더 입력으로 변경
+  currentPage: 'order-list',  // 초기 페이지를 오더 목록으로 변경
   currentView: 'month',
-  currentDate: dayjs().format('YYYY-MM-DD'), // 현재 날짜로 초기화
+  currentDate: dayjs().format('YYYY-MM'), // 월별 뷰를 위해 YYYY-MM 형식으로 초기화
   currentOrderType: 'all',
   searchQuery: '',
   orders: [],

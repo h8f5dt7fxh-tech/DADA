@@ -140,7 +140,7 @@ app.get('/api/orders', async (c) => {
   
   // SQLite 변수 제한 (999개) 회피: 배치 처리
   // Cloudflare D1 실제 제한을 고려하여 작은 배치 사용
-  const batchSize = 200
+  const batchSize = 50
   let allRemarks: any[] = []
   let allBillings: any[] = []
   let allPayments: any[] = []
