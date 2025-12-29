@@ -1363,6 +1363,28 @@ app.post('/api/billing-sales/:id/contacts', async (c) => {
   }
 })
 
+// 담당자 수정
+app.put('/api/billing-contacts/:id', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    const { contact_name, contact_phone, memo } = await c.req.json()
+    
+    if (!contact_name) {
+      return c.json({ error: '담당자명은 필수입니다.' }, 400)
+    }
+    
+    await env.DB.prepare(
+      'UPDATE billing_contacts SET contact_name = ?, contact_phone = ?, memo = ? WHERE id = ?'
+    ).bind(contact_name, contact_phone || null, memo || null, id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // 담당자 삭제
 app.delete('/api/billing-contacts/:id', async (c) => {
   const { env } = c
@@ -1409,6 +1431,28 @@ app.post('/api/billing-sales/:id/shippers', async (c) => {
     ).bind(id, shipper_name, memo || null).run()
     
     return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 화주 수정
+app.put('/api/billing-shippers/:id', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    const { shipper_name, memo } = await c.req.json()
+    
+    if (!shipper_name) {
+      return c.json({ error: '화주명은 필수입니다.' }, 400)
+    }
+    
+    await env.DB.prepare(
+      'UPDATE billing_shippers SET shipper_name = ?, memo = ? WHERE id = ?'
+    ).bind(shipper_name, memo || null, id).run()
+    
+    return c.json({ success: true })
   } catch (error: any) {
     return c.json({ error: error.message }, 500)
   }

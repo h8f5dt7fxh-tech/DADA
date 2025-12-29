@@ -3408,15 +3408,21 @@ window.viewBillingDetail = async function(id) {
           ${contacts.length === 0 ? '<p class="text-gray-500 text-center py-4">등록된 담당자가 없습니다</p>' : 
             contacts.map(contact => `
               <div class="p-3 border rounded hover:bg-gray-50 flex justify-between items-center">
-                <div>
+                <div class="flex-1">
                   <div class="font-semibold">${contact.contact_name}</div>
                   ${contact.contact_phone ? `<div class="text-sm text-gray-600"><i class="fas fa-phone mr-1"></i>${contact.contact_phone}</div>` : ''}
                   ${contact.memo ? `<div class="text-sm text-gray-500 mt-1">${contact.memo}</div>` : ''}
                 </div>
-                <button onclick="window.deleteContact(${contact.id}, ${id})" 
-                        class="px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
-                  <i class="fas fa-trash"></i>
-                </button>
+                <div class="flex space-x-1">
+                  <button onclick="window.editContact(${contact.id}, ${id})" 
+                          class="px-2 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button onclick="window.deleteContact(${contact.id}, ${id})" 
+                          class="px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
               </div>
             `).join('')
           }
@@ -3438,14 +3444,20 @@ window.viewBillingDetail = async function(id) {
           ${shippers.length === 0 ? '<p class="text-gray-500 text-center py-4">등록된 화주가 없습니다</p>' : 
             shippers.map(shipper => `
               <div class="p-3 border rounded hover:bg-gray-50 flex justify-between items-center">
-                <div>
+                <div class="flex-1">
                   <div class="font-semibold">${shipper.shipper_name}</div>
                   ${shipper.memo ? `<div class="text-sm text-gray-500 mt-1">${shipper.memo}</div>` : ''}
                 </div>
-                <button onclick="window.deleteShipper(${shipper.id}, ${id})" 
-                        class="px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
-                  <i class="fas fa-trash"></i>
-                </button>
+                <div class="flex space-x-1">
+                  <button onclick="window.editShipper(${shipper.id}, ${id})" 
+                          class="px-2 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button onclick="window.deleteShipper(${shipper.id}, ${id})" 
+                          class="px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
               </div>
             `).join('')
           }
@@ -3518,6 +3530,102 @@ window.showAddContactModal = function(billingCompanyId) {
 }
 
 // 담당자 저장
+// 담당자 수정 모달
+window.editContact = async function(contactId, billingCompanyId) {
+  // 담당자 데이터 조회
+  let contact = null
+  try {
+    const response = await axios.get(`/api/billing-sales/${billingCompanyId}/contacts`)
+    contact = response.data.find(c => c.id === contactId)
+  } catch (error) {
+    console.error('데이터 로드 실패:', error)
+    alert('데이터를 불러올 수 없습니다.')
+    return
+  }
+  
+  if (!contact) {
+    alert('담당자를 찾을 수 없습니다.')
+    return
+  }
+  
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+      <h3 class="text-xl font-bold mb-4">담당자 수정</h3>
+      
+      <input type="hidden" id="edit_contact_id" value="${contactId}">
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">담당자명 *</label>
+        <input type="text" id="edit_contact_name" value="${contact.contact_name}" 
+               class="w-full px-3 py-2 border rounded">
+      </div>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">연락처</label>
+        <input type="text" id="edit_contact_phone" value="${contact.contact_phone || ''}" 
+               class="w-full px-3 py-2 border rounded">
+      </div>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">메모</label>
+        <textarea id="edit_contact_memo" rows="2"
+                  class="w-full px-3 py-2 border rounded">${contact.memo || ''}</textarea>
+      </div>
+      
+      <div class="flex justify-end space-x-2">
+        <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+          취소
+        </button>
+        <button onclick="window.updateContact(${billingCompanyId})" 
+                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <i class="fas fa-save mr-1"></i>수정
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  document.getElementById('edit_contact_name').focus()
+}
+
+// 담당자 수정 저장
+window.updateContact = async function(billingCompanyId) {
+  const id = document.getElementById('edit_contact_id')?.value
+  const name = document.getElementById('edit_contact_name')?.value.trim()
+  const phone = document.getElementById('edit_contact_phone')?.value.trim()
+  const memo = document.getElementById('edit_contact_memo')?.value.trim()
+  
+  if (!name) {
+    alert('담당자명을 입력해주세요.')
+    return
+  }
+  
+  try {
+    await axios.put(`/api/billing-contacts/${id}`, {
+      contact_name: name,
+      contact_phone: phone || null,
+      memo: memo || null
+    })
+    
+    alert('수정되었습니다.')
+    document.querySelector('.fixed.z-\\[60\\]')?.remove()
+    
+    // 상세 모달 새로고침
+    document.querySelector('.fixed.z-50')?.remove()
+    window.viewBillingDetail(billingCompanyId)
+  } catch (error) {
+    console.error('수정 실패:', error)
+    alert(`수정 실패: ${error.response?.data?.error || error.message}`)
+  }
+}
+
 window.saveContact = async function(billingCompanyId) {
   const name = document.getElementById('contact_name')?.value.trim()
   const phone = document.getElementById('contact_phone')?.value.trim()
@@ -3606,6 +3714,94 @@ window.showAddShipperModal = function(billingCompanyId) {
 }
 
 // 화주 저장
+// 화주 수정 모달
+window.editShipper = async function(shipperId, billingCompanyId) {
+  // 화주 데이터 조회
+  let shipper = null
+  try {
+    const response = await axios.get(`/api/billing-sales/${billingCompanyId}/shippers`)
+    shipper = response.data.find(s => s.id === shipperId)
+  } catch (error) {
+    console.error('데이터 로드 실패:', error)
+    alert('데이터를 불러올 수 없습니다.')
+    return
+  }
+  
+  if (!shipper) {
+    alert('화주를 찾을 수 없습니다.')
+    return
+  }
+  
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+      <h3 class="text-xl font-bold mb-4">화주 수정</h3>
+      
+      <input type="hidden" id="edit_shipper_id" value="${shipperId}">
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">화주명 *</label>
+        <input type="text" id="edit_shipper_name" value="${shipper.shipper_name}" 
+               class="w-full px-3 py-2 border rounded">
+      </div>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">메모</label>
+        <textarea id="edit_shipper_memo" rows="2"
+                  class="w-full px-3 py-2 border rounded">${shipper.memo || ''}</textarea>
+      </div>
+      
+      <div class="flex justify-end space-x-2">
+        <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+          취소
+        </button>
+        <button onclick="window.updateShipper(${billingCompanyId})" 
+                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <i class="fas fa-save mr-1"></i>수정
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  document.getElementById('edit_shipper_name').focus()
+}
+
+// 화주 수정 저장
+window.updateShipper = async function(billingCompanyId) {
+  const id = document.getElementById('edit_shipper_id')?.value
+  const name = document.getElementById('edit_shipper_name')?.value.trim()
+  const memo = document.getElementById('edit_shipper_memo')?.value.trim()
+  
+  if (!name) {
+    alert('화주명을 입력해주세요.')
+    return
+  }
+  
+  try {
+    await axios.put(`/api/billing-shippers/${id}`, {
+      shipper_name: name,
+      memo: memo || null
+    })
+    
+    alert('수정되었습니다.')
+    document.querySelector('.fixed.z-\\[60\\]')?.remove()
+    
+    // 상세 모달 새로고침
+    document.querySelector('.fixed.z-50')?.remove()
+    window.viewBillingDetail(billingCompanyId)
+  } catch (error) {
+    console.error('수정 실패:', error)
+    alert(`수정 실패: ${error.response?.data?.error || error.message}`)
+  }
+}
+
 window.saveShipper = async function(billingCompanyId) {
   const name = document.getElementById('shipper_name')?.value.trim()
   const memo = document.getElementById('shipper_memo')?.value.trim()
