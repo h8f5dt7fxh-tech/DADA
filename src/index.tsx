@@ -1325,6 +1325,108 @@ app.delete('/api/billing-sales/:billingCompany', async (c) => {
   }
 })
 
+// 청구처별 담당자 목록 조회
+app.get('/api/billing-sales/:id/contacts', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    const { results } = await env.DB.prepare(
+      'SELECT * FROM billing_contacts WHERE billing_company_id = ? ORDER BY created_at DESC'
+    ).bind(id).all()
+    
+    return c.json(results)
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 청구처별 담당자 추가
+app.post('/api/billing-sales/:id/contacts', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    const { contact_name, contact_phone, memo } = await c.req.json()
+    
+    if (!contact_name) {
+      return c.json({ error: '담당자명은 필수입니다.' }, 400)
+    }
+    
+    const result = await env.DB.prepare(
+      'INSERT INTO billing_contacts (billing_company_id, contact_name, contact_phone, memo) VALUES (?, ?, ?, ?)'
+    ).bind(id, contact_name, contact_phone || null, memo || null).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 담당자 삭제
+app.delete('/api/billing-contacts/:id', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    await env.DB.prepare('DELETE FROM billing_contacts WHERE id = ?').bind(id).run()
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 청구처별 화주 목록 조회
+app.get('/api/billing-sales/:id/shippers', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    const { results } = await env.DB.prepare(
+      'SELECT * FROM billing_shippers WHERE billing_company_id = ? ORDER BY created_at DESC'
+    ).bind(id).all()
+    
+    return c.json(results)
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 청구처별 화주 추가
+app.post('/api/billing-sales/:id/shippers', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    const { shipper_name, memo } = await c.req.json()
+    
+    if (!shipper_name) {
+      return c.json({ error: '화주명은 필수입니다.' }, 400)
+    }
+    
+    const result = await env.DB.prepare(
+      'INSERT INTO billing_shippers (billing_company_id, shipper_name, memo) VALUES (?, ?, ?)'
+    ).bind(id, shipper_name, memo || null).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 화주 삭제
+app.delete('/api/billing-shippers/:id', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    await env.DB.prepare('DELETE FROM billing_shippers WHERE id = ?').bind(id).run()
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // 협력업체 대량 업데이트
 app.post('/api/admin/import-dispatch-companies', async (c) => {
   const { env } = c
