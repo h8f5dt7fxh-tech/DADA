@@ -1100,19 +1100,24 @@ function renderClientsManagementPage() {
   return `
     <div class="bg-white p-6 rounded-lg shadow">
       <h2 class="text-2xl font-bold mb-4">
-        <i class="fas fa-building mr-2"></i>거래처 관리
+        <i class="fas fa-building mr-2"></i>거래처 관리 (청구처-영업담당자)
       </h2>
-      <p class="text-gray-600 mb-4">청구업체 - 화주 - 작업지 계층 구조로 관리됩니다.</p>
+      <p class="text-gray-600 mb-4">청구처별 영업담당자를 관리합니다.</p>
       
-      <div class="mb-4">
-        <button onclick="showAddBillingCompanyModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-          <i class="fas fa-plus mr-1"></i>청구업체 추가
+      <div class="mb-4 flex justify-between items-center">
+        <button onclick="showAddBillingSalesModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <i class="fas fa-plus mr-1"></i>청구처 추가
         </button>
+        <input type="text" id="billingSalesSearch" placeholder="검색..." 
+               oninput="filterBillingSales(this.value)" 
+               class="px-3 py-2 border rounded w-64">
       </div>
       
-      <div class="text-gray-500 text-center py-8">
-        <p>거래처 관리 UI는 곧 완성됩니다.</p>
-        <p class="text-sm mt-2">API는 이미 구현되어 있어 백엔드에서 사용 가능합니다.</p>
+      <div id="billingSalesTableContainer" class="overflow-auto">
+        <div class="text-center py-8">
+          <i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i>
+          <p class="text-gray-500 mt-2">로딩 중...</p>
+        </div>
       </div>
     </div>
   `
@@ -1839,7 +1844,8 @@ function renderFormFields() {
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block mb-1 font-semibold">청구처 :</label>
-            <input type="text" id="field_billing" placeholder="제이디쉬핑라인" class="w-full px-3 py-2 border rounded">
+            <input type="text" id="field_billing" placeholder="제이디쉬핑라인" class="w-full px-3 py-2 border rounded" onchange="fetchSalesPersonForBillingCompany(this.value, 'form_sales_person')">
+            <div id="form_sales_person_container" class="mt-1 text-sm text-blue-600"></div>
           </div>
           <div>
             <label class="block mb-1 font-semibold">화주 :</label>
@@ -1938,7 +1944,8 @@ function renderFormFields() {
           </div>
           <div>
             <label class="block mb-1 font-semibold">청구처 :</label>
-            <input type="text" id="field_billing" placeholder="청구처명" class="w-full px-3 py-2 border rounded">
+            <input type="text" id="field_billing" placeholder="청구처명" class="w-full px-3 py-2 border rounded" onchange="fetchSalesPersonForBillingCompany(this.value, 'form_sales_person')">
+            <div id="form_sales_person_container" class="mt-1 text-sm text-blue-600"></div>
           </div>
         </div>
         
@@ -2251,6 +2258,8 @@ function changePage(page) {
     fetchTodos()
   } else if (page === 'create-order') {
     renderInputContent()
+  } else if (page === 'clients') {
+    fetchBillingSales()
   }
 }
 
@@ -3054,6 +3063,212 @@ async function fetchSalesPersonForBillingCompany(billingCompany, targetContainer
   } catch (error) {
     console.error('영업담당자 조회 실패:', error)
     container.innerHTML = ''
+  }
+}
+
+// ============================================
+// 거래처 관리 (청구처-영업담당자)
+// ============================================
+
+let allBillingSales = []
+
+async function fetchBillingSales() {
+  try {
+    const response = await axios.get('/api/billing-sales')
+    allBillingSales = response.data
+    renderBillingSalesTable(allBillingSales)
+  } catch (error) {
+    console.error('거래처 목록 조회 실패:', error)
+    const container = document.getElementById('billingSalesTableContainer')
+    if (container) {
+      container.innerHTML = '<div class="text-center py-8 text-red-500">데이터 로딩 실패</div>'
+    }
+  }
+}
+
+function renderBillingSalesTable(data) {
+  const container = document.getElementById('billingSalesTableContainer')
+  if (!container) return
+  
+  if (data.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-8 text-gray-500">
+        <i class="fas fa-inbox text-4xl mb-2"></i>
+        <p>등록된 청구처가 없습니다</p>
+      </div>
+    `
+    return
+  }
+  
+  const tableHtml = `
+    <table class="w-full border-collapse">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-4 py-3 text-left border">청구처명</th>
+          <th class="px-4 py-3 text-left border">영업담당자</th>
+          <th class="px-4 py-3 text-center border">등록일</th>
+          <th class="px-4 py-3 text-center border w-32">관리</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.map(item => `
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 border">${item.billing_company}</td>
+            <td class="px-4 py-3 border">
+              <i class="fas fa-user mr-1 text-blue-600"></i>${item.sales_person}
+            </td>
+            <td class="px-4 py-3 border text-center text-sm text-gray-600">
+              ${new Date(item.created_at).toLocaleDateString('ko-KR')}
+            </td>
+            <td class="px-4 py-3 border text-center">
+              <button onclick="editBillingSales('${item.billing_company.replace(/'/g, "\\'")}', '${item.sales_person.replace(/'/g, "\\'")})" 
+                      class="px-2 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 mr-1">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button onclick="deleteBillingSales('${item.billing_company.replace(/'/g, "\\'")})" 
+                      class="px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
+                <i class="fas fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div class="mt-4 text-sm text-gray-600">
+      총 <strong>${data.length}</strong>개의 청구처
+    </div>
+  `
+  
+  container.innerHTML = tableHtml
+}
+
+function filterBillingSales(searchText) {
+  if (!searchText || searchText.trim() === '') {
+    renderBillingSalesTable(allBillingSales)
+    return
+  }
+  
+  const filtered = allBillingSales.filter(item => 
+    item.billing_company.includes(searchText) || 
+    item.sales_person.includes(searchText)
+  )
+  renderBillingSalesTable(filtered)
+}
+
+function showAddBillingSalesModal() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+      <h3 class="text-xl font-bold mb-4">청구처 추가</h3>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">청구처명 *</label>
+        <input type="text" id="modal_billing_company" placeholder="청구처명 입력" 
+               class="w-full px-3 py-2 border rounded">
+      </div>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">영업담당자 *</label>
+        <input type="text" id="modal_sales_person" placeholder="영업담당자 입력" 
+               class="w-full px-3 py-2 border rounded">
+      </div>
+      
+      <div class="flex justify-end space-x-2">
+        <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+          취소
+        </button>
+        <button onclick="saveBillingSales()" 
+                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <i class="fas fa-save mr-1"></i>저장
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  document.getElementById('modal_billing_company').focus()
+}
+
+function editBillingSales(billingCompany, salesPerson) {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+      <h3 class="text-xl font-bold mb-4">청구처 수정</h3>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">청구처명</label>
+        <input type="text" id="modal_billing_company" value="${billingCompany}" 
+               readonly class="w-full px-3 py-2 border rounded bg-gray-100">
+      </div>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">영업담당자 *</label>
+        <input type="text" id="modal_sales_person" value="${salesPerson}" 
+               class="w-full px-3 py-2 border rounded">
+      </div>
+      
+      <div class="flex justify-end space-x-2">
+        <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+          취소
+        </button>
+        <button onclick="saveBillingSales()" 
+                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <i class="fas fa-save mr-1"></i>수정
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  document.getElementById('modal_sales_person').focus()
+}
+
+async function saveBillingSales() {
+  const billingCompany = document.getElementById('modal_billing_company')?.value.trim()
+  const salesPerson = document.getElementById('modal_sales_person')?.value.trim()
+  
+  if (!billingCompany || !salesPerson) {
+    alert('청구처명과 영업담당자를 모두 입력해주세요.')
+    return
+  }
+  
+  try {
+    await axios.post('/api/billing-sales', {
+      billing_company: billingCompany,
+      sales_person: salesPerson
+    })
+    
+    alert('저장되었습니다.')
+    document.querySelector('.fixed')?.remove()
+    fetchBillingSales()
+  } catch (error) {
+    console.error('저장 실패:', error)
+    alert(`저장 실패: ${error.response?.data?.error || error.message}`)
+  }
+}
+
+async function deleteBillingSales(billingCompany) {
+  if (!confirm(`"${billingCompany}"를 삭제하시겠습니까?`)) return
+  
+  try {
+    await axios.delete(`/api/billing-sales/${encodeURIComponent(billingCompany)}`)
+    alert('삭제되었습니다.')
+    fetchBillingSales()
+  } catch (error) {
+    console.error('삭제 실패:', error)
+    alert(`삭제 실패: ${error.response?.data?.error || error.message}`)
   }
 }
 
