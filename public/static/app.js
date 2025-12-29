@@ -4,7 +4,7 @@
 const state = {
   currentPage: 'orders',  // 초기 페이지를 오더 목록으로 변경
   currentView: 'month',
-  currentDate: dayjs().format('YYYY-MM'), // 월별 뷰를 위해 YYYY-MM 형식으로 초기화
+  currentDate: dayjs().format('YYYY-MM-DD'), // 날짜 입력 필드를 위해 YYYY-MM-DD 형식으로 초기화
   currentOrderType: 'all',
   searchQuery: '',
   orders: [],
