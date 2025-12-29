@@ -3155,7 +3155,7 @@ function filterBillingSales(searchText) {
   renderBillingSalesTable(filtered)
 }
 
-function showAddBillingSalesModal() {
+window.showAddBillingSalesModal = function() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
   modal.onclick = (e) => {
@@ -3183,7 +3183,7 @@ function showAddBillingSalesModal() {
                 class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
           취소
         </button>
-        <button onclick="saveBillingSales()" 
+        <button onclick="window.saveBillingSales()" 
                 class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
           <i class="fas fa-save mr-1"></i>저장
         </button>
@@ -3195,7 +3195,7 @@ function showAddBillingSalesModal() {
   document.getElementById('modal_billing_company').focus()
 }
 
-function editBillingSales(billingCompany, salesPerson) {
+window.editBillingSales = function(billingCompany, salesPerson) {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
   modal.onclick = (e) => {
@@ -3223,7 +3223,7 @@ function editBillingSales(billingCompany, salesPerson) {
                 class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
           취소
         </button>
-        <button onclick="saveBillingSales()" 
+        <button onclick="window.saveBillingSales()" 
                 class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
           <i class="fas fa-save mr-1"></i>수정
         </button>
@@ -3235,7 +3235,7 @@ function editBillingSales(billingCompany, salesPerson) {
   document.getElementById('modal_sales_person').focus()
 }
 
-async function saveBillingSales() {
+window.saveBillingSales = async function() {
   const billingCompany = document.getElementById('modal_billing_company')?.value.trim()
   const salesPerson = document.getElementById('modal_sales_person')?.value.trim()
   
@@ -3259,7 +3259,7 @@ async function saveBillingSales() {
   }
 }
 
-async function deleteBillingSales(billingCompany) {
+window.deleteBillingSales = async function(billingCompany) {
   if (!confirm(`"${billingCompany}"를 삭제하시겠습니까?`)) return
   
   try {
