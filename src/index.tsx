@@ -1293,17 +1293,17 @@ app.post('/api/billing-sales', async (c) => {
   const { env } = c
   
   try {
-    const { billing_company, sales_person } = await c.req.json()
+    const { billing_company, sales_person, contact_person, shipper_name, memo } = await c.req.json()
     
     if (!billing_company || !sales_person) {
       return c.json({ error: '청구처명과 영업담당자는 필수입니다.' }, 400)
     }
     
     await env.DB.prepare(
-      'INSERT OR REPLACE INTO billing_company_sales (billing_company, sales_person, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)'
-    ).bind(billing_company, sales_person).run()
+      'INSERT OR REPLACE INTO billing_company_sales (billing_company, sales_person, contact_person, shipper_name, memo, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)'
+    ).bind(billing_company, sales_person, contact_person || null, shipper_name || null, memo || null).run()
     
-    return c.json({ success: true, billing_company, sales_person })
+    return c.json({ success: true, billing_company, sales_person, contact_person, shipper_name, memo })
   } catch (error: any) {
     return c.json({ error: error.message }, 500)
   }

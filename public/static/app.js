@@ -3106,6 +3106,9 @@ function renderBillingSalesTable(data) {
         <tr>
           <th class="px-4 py-3 text-left border">청구처명</th>
           <th class="px-4 py-3 text-left border">영업담당자</th>
+          <th class="px-4 py-3 text-left border">담당자</th>
+          <th class="px-4 py-3 text-left border">화주</th>
+          <th class="px-4 py-3 text-left border">메모</th>
           <th class="px-4 py-3 text-center border">등록일</th>
           <th class="px-4 py-3 text-center border w-32">관리</th>
         </tr>
@@ -3113,19 +3116,22 @@ function renderBillingSalesTable(data) {
       <tbody>
         ${data.map(item => `
           <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 border">${item.billing_company}</td>
+            <td class="px-4 py-3 border font-semibold">${item.billing_company}</td>
             <td class="px-4 py-3 border">
               <i class="fas fa-user mr-1 text-blue-600"></i>${item.sales_person}
             </td>
+            <td class="px-4 py-3 border text-sm">${item.contact_person || '-'}</td>
+            <td class="px-4 py-3 border text-sm">${item.shipper_name || '-'}</td>
+            <td class="px-4 py-3 border text-sm text-gray-600">${item.memo ? (item.memo.length > 20 ? item.memo.substring(0, 20) + '...' : item.memo) : '-'}</td>
             <td class="px-4 py-3 border text-center text-sm text-gray-600">
               ${new Date(item.created_at).toLocaleDateString('ko-KR')}
             </td>
             <td class="px-4 py-3 border text-center">
-              <button onclick="editBillingSales('${item.billing_company.replace(/'/g, "\\'")}', '${item.sales_person.replace(/'/g, "\\'")})" 
+              <button onclick="window.editBillingSales(${item.id})" 
                       class="px-2 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 mr-1">
                 <i class="fas fa-edit"></i>
               </button>
-              <button onclick="deleteBillingSales('${item.billing_company.replace(/'/g, "\\'")})" 
+              <button onclick="window.deleteBillingSales('${item.billing_company.replace(/'/g, "\\'")})" 
                       class="px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
                 <i class="fas fa-trash"></i>
               </button>
@@ -3150,7 +3156,10 @@ function filterBillingSales(searchText) {
   
   const filtered = allBillingSales.filter(item => 
     item.billing_company.includes(searchText) || 
-    item.sales_person.includes(searchText)
+    item.sales_person.includes(searchText) ||
+    (item.contact_person && item.contact_person.includes(searchText)) ||
+    (item.shipper_name && item.shipper_name.includes(searchText)) ||
+    (item.memo && item.memo.includes(searchText))
   )
   renderBillingSalesTable(filtered)
 }
@@ -3163,19 +3172,41 @@ window.showAddBillingSalesModal = function() {
   }
   
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
       <h3 class="text-xl font-bold mb-4">청구처 추가</h3>
       
-      <div class="mb-4">
-        <label class="block mb-2 font-semibold">청구처명 *</label>
-        <input type="text" id="modal_billing_company" placeholder="청구처명 입력" 
-               class="w-full px-3 py-2 border rounded">
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block mb-2 font-semibold">청구처명 *</label>
+          <input type="text" id="modal_billing_company" placeholder="청구처명 입력" 
+                 class="w-full px-3 py-2 border rounded">
+        </div>
+        
+        <div>
+          <label class="block mb-2 font-semibold">영업담당자 *</label>
+          <input type="text" id="modal_sales_person" placeholder="영업담당자 입력" 
+                 class="w-full px-3 py-2 border rounded">
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block mb-2 font-semibold">담당자</label>
+          <input type="text" id="modal_contact_person" placeholder="담당자 입력" 
+                 class="w-full px-3 py-2 border rounded">
+        </div>
+        
+        <div>
+          <label class="block mb-2 font-semibold">화주</label>
+          <input type="text" id="modal_shipper_name" placeholder="화주 입력" 
+                 class="w-full px-3 py-2 border rounded">
+        </div>
       </div>
       
       <div class="mb-4">
-        <label class="block mb-2 font-semibold">영업담당자 *</label>
-        <input type="text" id="modal_sales_person" placeholder="영업담당자 입력" 
-               class="w-full px-3 py-2 border rounded">
+        <label class="block mb-2 font-semibold">메모</label>
+        <textarea id="modal_memo" placeholder="메모 입력" rows="3"
+                  class="w-full px-3 py-2 border rounded"></textarea>
       </div>
       
       <div class="flex justify-end space-x-2">
@@ -3195,7 +3226,14 @@ window.showAddBillingSalesModal = function() {
   document.getElementById('modal_billing_company').focus()
 }
 
-window.editBillingSales = function(billingCompany, salesPerson) {
+window.editBillingSales = function(id) {
+  // ID로 데이터 찾기
+  const item = allBillingSales.find(b => b.id === id)
+  if (!item) {
+    alert('데이터를 찾을 수 없습니다.')
+    return
+  }
+  
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
   modal.onclick = (e) => {
@@ -3203,19 +3241,41 @@ window.editBillingSales = function(billingCompany, salesPerson) {
   }
   
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
       <h3 class="text-xl font-bold mb-4">청구처 수정</h3>
       
-      <div class="mb-4">
-        <label class="block mb-2 font-semibold">청구처명</label>
-        <input type="text" id="modal_billing_company" value="${billingCompany}" 
-               readonly class="w-full px-3 py-2 border rounded bg-gray-100">
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block mb-2 font-semibold">청구처명</label>
+          <input type="text" id="modal_billing_company" value="${item.billing_company}" 
+                 readonly class="w-full px-3 py-2 border rounded bg-gray-100">
+        </div>
+        
+        <div>
+          <label class="block mb-2 font-semibold">영업담당자 *</label>
+          <input type="text" id="modal_sales_person" value="${item.sales_person}" 
+                 class="w-full px-3 py-2 border rounded">
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block mb-2 font-semibold">담당자</label>
+          <input type="text" id="modal_contact_person" value="${item.contact_person || ''}" 
+                 class="w-full px-3 py-2 border rounded">
+        </div>
+        
+        <div>
+          <label class="block mb-2 font-semibold">화주</label>
+          <input type="text" id="modal_shipper_name" value="${item.shipper_name || ''}" 
+                 class="w-full px-3 py-2 border rounded">
+        </div>
       </div>
       
       <div class="mb-4">
-        <label class="block mb-2 font-semibold">영업담당자 *</label>
-        <input type="text" id="modal_sales_person" value="${salesPerson}" 
-               class="w-full px-3 py-2 border rounded">
+        <label class="block mb-2 font-semibold">메모</label>
+        <textarea id="modal_memo" rows="3"
+                  class="w-full px-3 py-2 border rounded">${item.memo || ''}</textarea>
       </div>
       
       <div class="flex justify-end space-x-2">
@@ -3238,6 +3298,9 @@ window.editBillingSales = function(billingCompany, salesPerson) {
 window.saveBillingSales = async function() {
   const billingCompany = document.getElementById('modal_billing_company')?.value.trim()
   const salesPerson = document.getElementById('modal_sales_person')?.value.trim()
+  const contactPerson = document.getElementById('modal_contact_person')?.value.trim()
+  const shipperName = document.getElementById('modal_shipper_name')?.value.trim()
+  const memo = document.getElementById('modal_memo')?.value.trim()
   
   if (!billingCompany || !salesPerson) {
     alert('청구처명과 영업담당자를 모두 입력해주세요.')
@@ -3247,7 +3310,10 @@ window.saveBillingSales = async function() {
   try {
     await axios.post('/api/billing-sales', {
       billing_company: billingCompany,
-      sales_person: salesPerson
+      sales_person: salesPerson,
+      contact_person: contactPerson || null,
+      shipper_name: shipperName || null,
+      memo: memo || null
     })
     
     alert('저장되었습니다.')
