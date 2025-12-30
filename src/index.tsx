@@ -277,6 +277,34 @@ app.post('/api/orders', async (c) => {
     
     const orderId = result.meta.last_row_id
     
+    // 청구처-화주 자동 학습: 새로운 조합이면 자동으로 billing_shippers에 추가
+    if (billing_company && shipper) {
+      try {
+        // billing_company_sales에서 청구처 ID 조회
+        const billingCompanySales = await env.DB.prepare(
+          'SELECT id FROM billing_company_sales WHERE billing_company = ?'
+        ).bind(billing_company).first()
+        
+        if (billingCompanySales) {
+          // 이미 등록된 화주인지 확인
+          const existingShipper = await env.DB.prepare(
+            'SELECT id FROM billing_shippers WHERE billing_company_id = ? AND shipper_name = ?'
+          ).bind(billingCompanySales.id, shipper).first()
+          
+          // 없으면 자동으로 추가
+          if (!existingShipper) {
+            await env.DB.prepare(
+              'INSERT INTO billing_shippers (billing_company_id, shipper_name, memo) VALUES (?, ?, ?)'
+            ).bind(billingCompanySales.id, shipper, '자동 학습').run()
+            console.log(`✅ 자동 학습: ${billing_company} → ${shipper}`)
+          }
+        }
+      } catch (error) {
+        console.error('Auto-learning shipper error:', error)
+        // 학습 실패해도 오더 생성은 계속 진행
+      }
+    }
+    
     // 비고 삽입
     if (remarks && Array.isArray(remarks)) {
       for (const remark of remarks) {
@@ -354,6 +382,34 @@ app.put('/api/orders/:id', async (c) => {
     dispatch_company, vehicle_info, status, weighing_required,
     id
   ).run()
+  
+  // 청구처-화주 자동 학습: 새로운 조합이면 자동으로 billing_shippers에 추가
+  if (billing_company && shipper) {
+    try {
+      // billing_company_sales에서 청구처 ID 조회
+      const billingCompanySales = await env.DB.prepare(
+        'SELECT id FROM billing_company_sales WHERE billing_company = ?'
+      ).bind(billing_company).first()
+      
+      if (billingCompanySales) {
+        // 이미 등록된 화주인지 확인
+        const existingShipper = await env.DB.prepare(
+          'SELECT id FROM billing_shippers WHERE billing_company_id = ? AND shipper_name = ?'
+        ).bind(billingCompanySales.id, shipper).first()
+        
+        // 없으면 자동으로 추가
+        if (!existingShipper) {
+          await env.DB.prepare(
+            'INSERT INTO billing_shippers (billing_company_id, shipper_name, memo) VALUES (?, ?, ?)'
+          ).bind(billingCompanySales.id, shipper, '자동 학습').run()
+          console.log(`✅ 자동 학습: ${billing_company} → ${shipper}`)
+        }
+      }
+    } catch (error) {
+      console.error('Auto-learning shipper error:', error)
+      // 학습 실패해도 오더 수정은 계속 진행
+    }
+  }
   
   return c.json({ message: '오더가 수정되었습니다' })
 })
