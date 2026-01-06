@@ -1635,6 +1635,136 @@ app.post('/api/admin/import-sales-mapping', async (c) => {
 })
 
 // ============================================
+// API Routes - 견적 관리
+// ============================================
+
+// 견적 목록 조회 (검색 기능 포함)
+app.get('/api/quotations', async (c) => {
+  const { env } = c
+  const { billing_company, shipper_name, work_site, route_type, search } = c.req.query()
+  
+  try {
+    let query = 'SELECT * FROM quotations WHERE 1=1'
+    const params: any[] = []
+    
+    // 개별 필터
+    if (billing_company) {
+      query += ' AND billing_company LIKE ?'
+      params.push(`%${billing_company}%`)
+    }
+    if (shipper_name) {
+      query += ' AND shipper_name LIKE ?'
+      params.push(`%${shipper_name}%`)
+    }
+    if (work_site) {
+      query += ' AND work_site LIKE ?'
+      params.push(`%${work_site}%`)
+    }
+    if (route_type) {
+      query += ' AND route_type = ?'
+      params.push(route_type)
+    }
+    
+    // 통합 검색 (모든 필드)
+    if (search) {
+      query += ' AND (billing_company LIKE ? OR shipper_name LIKE ? OR work_site LIKE ? OR route_type LIKE ?)'
+      const searchPattern = `%${search}%`
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern)
+    }
+    
+    query += ' ORDER BY updated_at DESC'
+    
+    const { results } = await env.DB.prepare(query).bind(...params).all()
+    return c.json(results)
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 견적 추가
+app.post('/api/quotations', async (c) => {
+  const { env } = c
+  
+  try {
+    const { billing_company, shipper_name, work_site, route_type, container_size, price, memo } = await c.req.json()
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO quotations (billing_company, shipper_name, work_site, route_type, container_size, price, memo)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(billing_company, shipper_name, work_site, route_type, container_size || null, price, memo || null).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 견적 수정
+app.put('/api/quotations/:id', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    const { billing_company, shipper_name, work_site, route_type, container_size, price, memo } = await c.req.json()
+    
+    await env.DB.prepare(`
+      UPDATE quotations 
+      SET billing_company = ?, shipper_name = ?, work_site = ?, route_type = ?, 
+          container_size = ?, price = ?, memo = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(billing_company, shipper_name, work_site, route_type, container_size || null, price, memo || null, id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 견적 삭제
+app.delete('/api/quotations/:id', async (c) => {
+  const { env } = c
+  const id = parseInt(c.req.param('id'))
+  
+  try {
+    await env.DB.prepare('DELETE FROM quotations WHERE id = ?').bind(id).run()
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 빠른 검색: 청구처 → 화주 → 작업지 → 노선별 견적 조회
+app.get('/api/quotations/quick-search', async (c) => {
+  const { env } = c
+  const { billing_company, shipper_name, work_site } = c.req.query()
+  
+  try {
+    let query = 'SELECT * FROM quotations WHERE 1=1'
+    const params: any[] = []
+    
+    if (billing_company) {
+      query += ' AND billing_company = ?'
+      params.push(billing_company)
+    }
+    if (shipper_name) {
+      query += ' AND shipper_name = ?'
+      params.push(shipper_name)
+    }
+    if (work_site) {
+      query += ' AND work_site = ?'
+      params.push(work_site)
+    }
+    
+    query += ' ORDER BY route_type ASC'
+    
+    const { results } = await env.DB.prepare(query).bind(...params).all()
+    return c.json(results)
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// ============================================
 // 메인 페이지
 // ============================================
 
