@@ -1917,6 +1917,101 @@ app.get('/api/quotations/quick-search', async (c) => {
 })
 
 // ============================================
+// API Routes - 화주별 견적 관리
+// ============================================
+
+// 화주별 견적 목록 조회
+app.get('/api/shipper-quotations/:shipperId', async (c) => {
+  const { env } = c
+  const { shipperId } = c.req.param()
+  
+  try {
+    const { results } = await env.DB.prepare(`
+      SELECT * FROM shipper_quotations 
+      WHERE shipper_id = ? 
+      ORDER BY created_at DESC
+    `).bind(shipperId).all()
+    
+    return c.json(results)
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 화주별 견적 추가
+app.post('/api/shipper-quotations', async (c) => {
+  const { env } = c
+  
+  try {
+    const { shipper_id, billing_company_id, work_site, route_type, container_size, price, memo, photo_url } = await c.req.json()
+    
+    if (!shipper_id || !billing_company_id || !work_site || !route_type || !price) {
+      return c.json({ error: '필수 필드가 누락되었습니다' }, 400)
+    }
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO shipper_quotations (shipper_id, billing_company_id, work_site, route_type, container_size, price, memo, photo_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(shipper_id, billing_company_id, work_site, route_type, container_size, price, memo, photo_url).run()
+    
+    return c.json({ id: result.meta.last_row_id, message: '견적이 추가되었습니다' })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 화주별 견적 수정
+app.put('/api/shipper-quotations/:id', async (c) => {
+  const { env } = c
+  const { id } = c.req.param()
+  
+  try {
+    const { work_site, route_type, container_size, price, memo, photo_url } = await c.req.json()
+    
+    if (!work_site || !route_type || !price) {
+      return c.json({ error: '필수 필드가 누락되었습니다' }, 400)
+    }
+    
+    // photo_url이 undefined가 아닐 때만 업데이트
+    let query = `
+      UPDATE shipper_quotations 
+      SET work_site = ?, route_type = ?, container_size = ?, price = ?, memo = ?, updated_at = CURRENT_TIMESTAMP
+    `
+    const params = [work_site, route_type, container_size, price, memo]
+    
+    if (photo_url !== undefined) {
+      query += `, photo_url = ?`
+      params.push(photo_url)
+    }
+    
+    query += ` WHERE id = ?`
+    params.push(id)
+    
+    await env.DB.prepare(query).bind(...params).run()
+    
+    return c.json({ message: '견적이 수정되었습니다' })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 화주별 견적 삭제
+app.delete('/api/shipper-quotations/:id', async (c) => {
+  const { env } = c
+  const { id } = c.req.param()
+  
+  try {
+    await env.DB.prepare(`
+      DELETE FROM shipper_quotations WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ message: '견적이 삭제되었습니다' })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// ============================================
 // 메인 페이지
 // ============================================
 
