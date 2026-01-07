@@ -1498,15 +1498,47 @@ app.put('/api/billing-shippers/:id', async (c) => {
   const id = parseInt(c.req.param('id'))
   
   try {
-    const { shipper_name, memo } = await c.req.json()
+    const body = await c.req.json()
+    const { shipper_name, memo, quotation, photo_url } = body
     
-    if (!shipper_name) {
+    // shipper_name이 있으면 필수 검증
+    if (shipper_name !== undefined && !shipper_name) {
       return c.json({ error: '화주명은 필수입니다.' }, 400)
     }
     
+    // 동적으로 업데이트할 필드 구성
+    const updates: string[] = []
+    const params: any[] = []
+    
+    if (shipper_name !== undefined) {
+      updates.push('shipper_name = ?')
+      params.push(shipper_name)
+    }
+    
+    if (memo !== undefined) {
+      updates.push('memo = ?')
+      params.push(memo || null)
+    }
+    
+    if (quotation !== undefined) {
+      updates.push('quotation = ?')
+      params.push(quotation || null)
+    }
+    
+    if (photo_url !== undefined) {
+      updates.push('photo_url = ?')
+      params.push(photo_url || null)
+    }
+    
+    if (updates.length === 0) {
+      return c.json({ error: '업데이트할 필드가 없습니다' }, 400)
+    }
+    
+    params.push(id)
+    
     await env.DB.prepare(
-      'UPDATE billing_shippers SET shipper_name = ?, memo = ? WHERE id = ?'
-    ).bind(shipper_name, memo || null, id).run()
+      `UPDATE billing_shippers SET ${updates.join(', ')} WHERE id = ?`
+    ).bind(...params).run()
     
     return c.json({ success: true })
   } catch (error: any) {

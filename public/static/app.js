@@ -3477,29 +3477,59 @@ window.viewBillingDetail = async function(id) {
             <i class="fas fa-plus mr-1"></i>화주 추가
           </button>
         </div>
-        <div id="shippers_${id}" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          ${shippers.length === 0 ? '<p class="text-gray-500 text-center py-4 col-span-2">등록된 화주가 없습니다</p>' : 
+        <div id="shippers_${id}" class="grid grid-cols-1 gap-4">
+          ${shippers.length === 0 ? '<p class="text-gray-500 text-center py-4">등록된 화주가 없습니다</p>' : 
             shippers.map(shipper => `
               <div class="p-4 border rounded-lg hover:shadow-md transition-shadow bg-white">
-                <div class="flex justify-between items-start mb-2">
+                <div class="flex justify-between items-start mb-3">
                   <div class="flex-1">
-                    <div class="font-bold text-lg text-gray-800">${shipper.shipper_name}</div>
+                    <div class="font-bold text-xl text-gray-800">${shipper.shipper_name}</div>
                     ${shipper.memo ? `<div class="text-sm text-gray-600 mt-1">${shipper.memo}</div>` : ''}
                   </div>
+                  <div class="flex gap-1">
+                    <button onclick="window.editShipper(${shipper.id}, ${id})" 
+                            class="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                      <i class="fas fa-edit"></i> 수정
+                    </button>
+                    <button onclick="window.deleteShipper(${shipper.id}, ${id})" 
+                            class="px-3 py-1.5 bg-red-500 text-white text-sm rounded hover:bg-red-600">
+                      <i class="fas fa-trash"></i> 삭제
+                    </button>
+                  </div>
                 </div>
-                <div class="flex flex-wrap gap-1 mt-3">
-                  <button onclick="window.viewShipperQuotations(${shipper.id}, ${id}, '${shipper.shipper_name.replace(/'/g, "\\'")}')" 
-                          class="flex-1 px-3 py-1.5 bg-indigo-500 text-white text-sm rounded hover:bg-indigo-600">
-                    <i class="fas fa-file-invoice-dollar mr-1"></i>견적 관리
-                  </button>
-                  <button onclick="window.editShipper(${shipper.id}, ${id})" 
-                          class="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button onclick="window.deleteShipper(${shipper.id}, ${id})" 
-                          class="px-3 py-1.5 bg-red-500 text-white text-sm rounded hover:bg-red-600">
-                    <i class="fas fa-trash"></i>
-                  </button>
+                
+                <!-- 견적 영역 -->
+                <div class="border-t pt-3 mt-3">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="font-semibold text-gray-700">
+                      <i class="fas fa-file-invoice-dollar mr-1 text-indigo-600"></i>견적
+                    </span>
+                    <button onclick="window.editShipperQuotation(${shipper.id}, ${id})" 
+                            class="px-3 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600">
+                      <i class="fas fa-edit mr-1"></i>${shipper.quotation ? '수정' : '작성'}
+                    </button>
+                  </div>
+                  ${shipper.quotation ? `
+                    <div class="bg-gray-50 rounded p-3 text-sm" style="white-space: pre-wrap;">${shipper.quotation.split('\\n').map(line => {
+                      line = line.trim()
+                      if (!line) return '<br>'
+                      if (/\\d+[,\\d]*\\s*원/.test(line)) {
+                        return '<div class="text-green-600 font-semibold ml-4">' + line + '</div>'
+                      } else if (/왕복|편도|수입|수출/.test(line)) {
+                        return '<div class="text-blue-600 font-bold mt-2 mb-1">' + line + '</div>'
+                      } else {
+                        return '<div class="text-gray-700">' + line + '</div>'
+                      }
+                    }).join('')}</div>
+                  ` : '<p class="text-gray-400 text-sm">견적 없음</p>'}
+                  
+                  ${shipper.photo_url ? `
+                    <div class="mt-3">
+                      <img src="${shipper.photo_url}" alt="견적 사진" 
+                           class="w-full max-w-md rounded cursor-pointer hover:opacity-90"
+                           onclick="window.viewPhotoModal('${shipper.photo_url}')">
+                    </div>
+                  ` : ''}
                 </div>
               </div>
             `).join('')
@@ -3814,6 +3844,168 @@ window.editShipper = async function(shipperId, billingCompanyId) {
   
   document.body.appendChild(modal)
   document.getElementById('edit_shipper_name').focus()
+}
+
+// 화주 견적 편집
+window.editShipperQuotation = async function(shipperId, billingCompanyId) {
+  // 화주 데이터 조회
+  let shipper = null
+  try {
+    const response = await axios.get(`/api/billing-sales/${billingCompanyId}/shippers`)
+    shipper = response.data.find(s => s.id === shipperId)
+  } catch (error) {
+    console.error('데이터 로드 실패:', error)
+    alert('데이터를 불러올 수 없습니다.')
+    return
+  }
+  
+  if (!shipper) {
+    alert('화주를 찾을 수 없습니다.')
+    return
+  }
+  
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold">
+          <i class="fas fa-file-invoice-dollar mr-2 text-indigo-600"></i>${shipper.shipper_name} - 견적 작성
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      
+      <div class="mb-4 p-4 bg-blue-50 rounded border border-blue-200">
+        <p class="text-sm text-gray-700 mb-2">
+          <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+          <strong>작성 방법:</strong> 자유롭게 입력하세요. 예시:
+        </p>
+        <pre class="text-xs text-gray-600 bg-white p-2 rounded">왕복 / 부산(북항)수입 - 경북경산시압량읍
+20':  323,000 원
+40':  366,000 원
+
+왕복 / 부산(신항)수입 - 경북경산시압량읍
+20':  318,000 원
+40':  360,000 원</pre>
+      </div>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">견적 내용</label>
+        <textarea id="shipper_quotation_content" rows="12" 
+                  placeholder="견적 내용을 자유롭게 입력하세요..."
+                  class="w-full px-3 py-2 border rounded font-mono text-sm">${shipper.quotation || ''}</textarea>
+      </div>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">사진</label>
+        <input type="file" id="shipper_quotation_photo" accept="image/*" 
+               class="w-full px-3 py-2 border rounded">
+        <p class="text-xs text-gray-500 mt-1">JPG, PNG 형식 (최대 5MB)</p>
+        ${shipper.photo_url ? `
+          <div class="mt-2">
+            <img src="${shipper.photo_url}" alt="기존 사진" class="w-32 h-32 object-cover rounded">
+            <button onclick="window.deleteShipperPhoto(${shipperId}, ${billingCompanyId})"
+                    class="mt-1 text-xs text-red-600 hover:text-red-700">
+              <i class="fas fa-trash mr-1"></i>사진 삭제
+            </button>
+          </div>
+        ` : ''}
+      </div>
+      
+      <div class="flex justify-end space-x-2">
+        <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">
+          취소
+        </button>
+        <button onclick="window.saveShipperQuotation(${shipperId}, ${billingCompanyId})" 
+                class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+          <i class="fas fa-save mr-1"></i>저장
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+// 화주 견적 저장
+window.saveShipperQuotation = async function(shipperId, billingCompanyId) {
+  const content = document.getElementById('shipper_quotation_content').value.trim()
+  const photoInput = document.getElementById('shipper_quotation_photo')
+  
+  let photoUrl = null
+  
+  // 사진 업로드 처리
+  if (photoInput.files && photoInput.files[0]) {
+    const file = photoInput.files[0]
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('파일 크기는 5MB 이하여야 합니다')
+      return
+    }
+    
+    try {
+      const reader = new FileReader()
+      photoUrl = await new Promise((resolve, reject) => {
+        reader.onload = (e) => resolve(e.target.result)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    } catch (error) {
+      console.error('파일 읽기 실패:', error)
+      alert('파일을 읽을 수 없습니다')
+      return
+    }
+  }
+  
+  try {
+    const updateData = {
+      quotation: content || null
+    }
+    
+    if (photoUrl) {
+      updateData.photo_url = photoUrl
+    }
+    
+    await axios.put(`/api/billing-shippers/${shipperId}`, updateData)
+    
+    alert('견적이 저장되었습니다')
+    document.querySelector('.fixed.z-\\[60\\]').remove()
+    
+    // 상세 모달 새로고침
+    document.querySelector('.fixed.z-50')?.remove()
+    window.viewBillingDetail(billingCompanyId)
+  } catch (error) {
+    console.error('견적 저장 실패:', error)
+    alert('견적 저장에 실패했습니다')
+  }
+}
+
+// 화주 사진 삭제
+window.deleteShipperPhoto = async function(shipperId, billingCompanyId) {
+  if (!confirm('사진을 삭제하시겠습니까?')) return
+  
+  try {
+    await axios.put(`/api/billing-shippers/${shipperId}`, {
+      photo_url: null
+    })
+    
+    alert('사진이 삭제되었습니다')
+    document.querySelector('.fixed.z-\\[60\\]').remove()
+    
+    // 상세 모달 새로고침
+    document.querySelector('.fixed.z-50')?.remove()
+    window.viewBillingDetail(billingCompanyId)
+  } catch (error) {
+    console.error('사진 삭제 실패:', error)
+    alert('사진 삭제에 실패했습니다')
+  }
 }
 
 // 화주 수정 저장
