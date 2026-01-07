@@ -3890,15 +3890,15 @@ window.deleteShipper = async function(shipperId, billingCompanyId) {
 }
 
 // ============================================
-// 화주 견적 관리
+// 화주 견적 관리 (간단 텍스트 방식)
 // ============================================
 
 window.viewShipperQuotations = async function(shipperId, billingCompanyId, shipperName) {
-  let quotations = []
+  let quotation = null
   
   try {
-    const response = await axios.get(`/api/shipper-quotations/${shipperId}`)
-    quotations = response.data
+    const response = await axios.get(`/api/simple-quotations/${shipperId}`)
+    quotation = response.data
   } catch (error) {
     console.error('견적 로드 실패:', error)
   }
@@ -3909,63 +3909,128 @@ window.viewShipperQuotations = async function(shipperId, billingCompanyId, shipp
     if (e.target === modal) modal.remove()
   }
   
+  // 견적 텍스트를 HTML로 변환 (줄바꿈 유지)
+  const formatQuotation = (content) => {
+    if (!content) return '<p class="text-gray-500">견적 내용이 없습니다</p>'
+    
+    return content.split('\n').map(line => {
+      line = line.trim()
+      if (!line) return '<br>'
+      
+      // 가격 라인 (숫자와 원이 있는 경우)
+      if (/\d+[,\d]*\s*원/.test(line)) {
+        return `<div class="text-lg font-semibold text-green-600 ml-4">${line}</div>`
+      }
+      // 헤더 라인 (왕복, 편도 등이 포함된 경우)
+      else if (/왕복|편도|수입|수출/.test(line)) {
+        return `<div class="text-xl font-bold text-blue-600 mt-4 mb-2">${line}</div>`
+      }
+      // 일반 텍스트
+      else {
+        return `<div class="text-gray-700">${line}</div>`
+      }
+    }).join('')
+  }
+  
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center mb-6">
         <h3 class="text-2xl font-bold">
-          <i class="fas fa-file-invoice-dollar mr-2 text-indigo-600"></i>${shipperName} - 견적 관리
+          <i class="fas fa-file-invoice-dollar mr-2 text-indigo-600"></i>${shipperName} - 견적
         </h3>
         <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
           <i class="fas fa-times text-2xl"></i>
         </button>
       </div>
       
-      <div class="mb-4">
-        <button onclick="window.showAddQuotationModal(${shipperId}, ${billingCompanyId})" 
+      <div class="mb-4 flex gap-2">
+        <button onclick="window.editSimpleQuotation(${shipperId}, ${billingCompanyId}, '${shipperName}')" 
                 class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-          <i class="fas fa-plus mr-1"></i>견적 추가
+          <i class="fas fa-edit mr-1"></i>${quotation ? '견적 수정' : '견적 작성'}
+        </button>
+        ${quotation ? `
+          <button onclick="window.deleteSimpleQuotation(${shipperId}, '${shipperName}')" 
+                  class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+            <i class="fas fa-trash mr-1"></i>견적 삭제
+          </button>
+        ` : ''}
+      </div>
+      
+      <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+        ${quotation ? formatQuotation(quotation.content) : '<p class="text-gray-500 text-center py-8">등록된 견적이 없습니다</p>'}
+      </div>
+      
+      ${quotation ? `
+        <div class="mt-4 text-sm text-gray-500 text-right">
+          최종 수정: ${new Date(quotation.updated_at).toLocaleString('ko-KR')}
+        </div>
+      ` : ''}
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+// 간단 견적 편집
+window.editSimpleQuotation = async function(shipperId, billingCompanyId, shipperName) {
+  let currentContent = ''
+  
+  try {
+    const response = await axios.get(`/api/simple-quotations/${shipperId}`)
+    if (response.data) {
+      currentContent = response.data.content
+    }
+  } catch (error) {
+    console.error('견적 로드 실패:', error)
+  }
+  
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold">
+          <i class="fas fa-edit mr-2 text-indigo-600"></i>${shipperName} - 견적 작성
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
         </button>
       </div>
       
-      <div id="quotations_${shipperId}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        ${quotations.length === 0 ? '<p class="text-gray-500 text-center py-8 col-span-3">등록된 견적이 없습니다</p>' : 
-          quotations.map(q => `
-            <div class="border rounded-lg p-4 hover:shadow-lg transition-shadow bg-gradient-to-br from-white to-gray-50">
-              ${q.photo_url ? `
-                <div class="mb-3">
-                  <img src="${q.photo_url}" alt="견적 사진" 
-                       class="w-full h-40 object-cover rounded cursor-pointer hover:opacity-90"
-                       onclick="window.viewPhotoModal('${q.photo_url}')">
-                </div>
-              ` : ''}
-              <div class="space-y-2">
-                <div class="flex justify-between items-start">
-                  <span class="font-bold text-lg text-indigo-600">${q.route_type}</span>
-                  <span class="text-sm px-2 py-1 bg-blue-100 text-blue-800 rounded">${q.container_size || '-'}</span>
-                </div>
-                <div class="text-gray-700">
-                  <i class="fas fa-map-marker-alt mr-1 text-red-500"></i>
-                  <span class="font-semibold">${q.work_site}</span>
-                </div>
-                <div class="text-2xl font-bold text-green-600">
-                  ${Number(q.price).toLocaleString()}원
-                </div>
-                ${q.memo ? `<div class="text-sm text-gray-600 border-t pt-2">${q.memo}</div>` : ''}
-                <div class="text-xs text-gray-400">${new Date(q.created_at).toLocaleDateString('ko-KR')}</div>
-              </div>
-              <div class="flex gap-1 mt-3">
-                <button onclick="window.editQuotation(${q.id}, ${shipperId}, ${billingCompanyId})" 
-                        class="flex-1 px-2 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                  <i class="fas fa-edit"></i> 수정
-                </button>
-                <button onclick="window.deleteQuotation(${q.id}, ${shipperId}, ${billingCompanyId})" 
-                        class="flex-1 px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
-                  <i class="fas fa-trash"></i> 삭제
-                </button>
-              </div>
-            </div>
-          `).join('')
-        }
+      <div class="mb-4 p-4 bg-blue-50 rounded border border-blue-200">
+        <p class="text-sm text-gray-700 mb-2">
+          <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+          <strong>작성 방법:</strong> 자유롭게 입력하세요. 예시:
+        </p>
+        <pre class="text-xs text-gray-600 bg-white p-2 rounded">왕복 / 부산(북항)수입 - 경북경산시압량읍
+20':  323,000 원
+40':  366,000 원
+
+왕복 / 부산(신항)수입 - 경북경산시압량읍
+20':  318,000 원
+40':  360,000 원</pre>
+      </div>
+      
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">견적 내용</label>
+        <textarea id="simple_quot_content" rows="15" 
+                  placeholder="견적 내용을 자유롭게 입력하세요..."
+                  class="w-full px-3 py-2 border rounded font-mono text-sm">${currentContent}</textarea>
+      </div>
+      
+      <div class="flex justify-end space-x-2">
+        <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">
+          취소
+        </button>
+        <button onclick="window.saveSimpleQuotation(${shipperId}, ${billingCompanyId})" 
+                class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+          <i class="fas fa-save mr-1"></i>저장
+        </button>
       </div>
     </div>
   `
@@ -3973,6 +4038,59 @@ window.viewShipperQuotations = async function(shipperId, billingCompanyId, shipp
   document.body.appendChild(modal)
 }
 
+// 간단 견적 저장
+window.saveSimpleQuotation = async function(shipperId, billingCompanyId) {
+  const content = document.getElementById('simple_quot_content').value.trim()
+  
+  if (!content) {
+    alert('견적 내용을 입력하세요')
+    return
+  }
+  
+  try {
+    await axios.post('/api/simple-quotations', {
+      shipper_id: shipperId,
+      billing_company_id: billingCompanyId,
+      content: content
+    })
+    
+    alert('견적이 저장되었습니다')
+    document.querySelector('.fixed.z-\\[80\\]').remove()
+    
+    // 견적 목록 새로고침
+    const listModal = document.querySelector('.fixed.z-\\[70\\]')
+    if (listModal) {
+      listModal.remove()
+      window.viewShipperQuotations(shipperId, billingCompanyId, '')
+    }
+  } catch (error) {
+    console.error('견적 저장 실패:', error)
+    alert('견적 저장에 실패했습니다')
+  }
+}
+
+// 간단 견적 삭제
+window.deleteSimpleQuotation = async function(shipperId, shipperName) {
+  if (!confirm(`${shipperName}의 견적을 삭제하시겠습니까?`)) {
+    return
+  }
+  
+  try {
+    await axios.delete(`/api/simple-quotations/${shipperId}`)
+    alert('견적이 삭제되었습니다')
+    
+    // 모달 닫고 재로드
+    const modal = document.querySelector('.fixed.z-\\[70\\]')
+    if (modal) {
+      modal.remove()
+    }
+  } catch (error) {
+    console.error('견적 삭제 실패:', error)
+    alert('견적 삭제에 실패했습니다')
+  }
+}
+
+// 구 견적 관리 함수들 (호환성 유지)
 window.showAddQuotationModal = function(shipperId, billingCompanyId) {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80]'

@@ -2012,6 +2012,84 @@ app.delete('/api/shipper-quotations/:id', async (c) => {
 })
 
 // ============================================
+// 간단 견적 관리 API
+// ============================================
+
+// 화주별 간단 견적 조회
+app.get('/api/simple-quotations/:shipperId', async (c) => {
+  const { env } = c
+  const { shipperId } = c.req.param()
+  
+  try {
+    const { results } = await env.DB.prepare(`
+      SELECT * FROM simple_quotations 
+      WHERE shipper_id = ? 
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).bind(shipperId).all()
+    
+    return c.json(results.length > 0 ? results[0] : null)
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 화주별 간단 견적 저장/수정
+app.post('/api/simple-quotations', async (c) => {
+  const { env } = c
+  
+  try {
+    const { shipper_id, billing_company_id, content } = await c.req.json()
+    
+    if (!shipper_id || !billing_company_id || !content) {
+      return c.json({ error: '필수 필드가 누락되었습니다' }, 400)
+    }
+    
+    // 기존 견적이 있는지 확인
+    const existing = await env.DB.prepare(`
+      SELECT id FROM simple_quotations WHERE shipper_id = ?
+    `).bind(shipper_id).first()
+    
+    if (existing) {
+      // 업데이트
+      await env.DB.prepare(`
+        UPDATE simple_quotations 
+        SET content = ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE shipper_id = ?
+      `).bind(content, shipper_id).run()
+      
+      return c.json({ id: existing.id, message: '견적이 수정되었습니다' })
+    } else {
+      // 새로 생성
+      const result = await env.DB.prepare(`
+        INSERT INTO simple_quotations (shipper_id, billing_company_id, content)
+        VALUES (?, ?, ?)
+      `).bind(shipper_id, billing_company_id, content).run()
+      
+      return c.json({ id: result.meta.last_row_id, message: '견적이 추가되었습니다' })
+    }
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 화주별 간단 견적 삭제
+app.delete('/api/simple-quotations/:shipperId', async (c) => {
+  const { env } = c
+  const { shipperId } = c.req.param()
+  
+  try {
+    await env.DB.prepare(`
+      DELETE FROM simple_quotations WHERE shipper_id = ?
+    `).bind(shipperId).run()
+    
+    return c.json({ message: '견적이 삭제되었습니다' })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// ============================================
 // 메인 페이지
 // ============================================
 
