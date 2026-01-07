@@ -829,8 +829,54 @@ function renderOrderList() {
     return
   }
   
-  // 일별 뷰: 깔끔한 카드 형식
-  const ordersHtml = state.orders.map(order => {
+  // 일별 뷰: 메모장 스타일 좌우 2분할
+  if (state.orders.length === 0) {
+    listContainer.innerHTML = `
+      <div class="text-center py-20">
+        <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+        <p class="text-gray-500">오더가 없습니다</p>
+      </div>
+    `
+    return
+  }
+  
+  // 좌측: 간단한 텍스트 목록
+  const textList = state.orders.map((order, index) => {
+    const typeLabel = {
+      'container_export': '수출',
+      'container_import': '수입',
+      'bulk': '벌크',
+      'lcl': 'LCL'
+    }[order.order_type]
+    
+    const hasDispatch = order.dispatch_company && order.dispatch_company.trim() !== ''
+    const hasVehicle = order.vehicle_info && order.vehicle_info.trim() !== ''
+    const needsAssignment = !hasDispatch || !hasVehicle
+    
+    const icon = needsAssignment ? '🔴' : '✅'
+    const textColor = needsAssignment ? 'text-red-600' : 'text-gray-700'
+    
+    return `
+      <div class="mb-4 p-3 border-l-4 ${needsAssignment ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white'} rounded cursor-pointer hover:bg-blue-50 transition" 
+           onclick="selectOrder(${index})">
+        <div class="font-mono text-xs ${textColor}">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-bold">${icon} ${typeLabel} #${index + 1}</span>
+            <span class="text-gray-500">${formatTime(order.work_datetime)}</span>
+          </div>
+          <div class="space-y-0.5 text-xs">
+            <div><span class="text-gray-500">청구처:</span> ${order.billing_company || '-'}</div>
+            <div><span class="text-gray-500">화주:</span> ${order.shipper || '-'}</div>
+            <div><span class="text-gray-500">BKG:</span> ${order.booking_number || order.bl_number || order.order_no || '-'}</div>
+            ${hasDispatch ? `<div class="text-green-600"><span class="text-gray-500">배차:</span> ${order.dispatch_company}</div>` : '<div class="text-red-600">⚠️ 배차 미지정</div>'}
+          </div>
+        </div>
+      </div>
+    `
+  }).join('')
+  
+  // 우측: 상세 카드 (선택된 오더)
+  const ordersHtml = state.orders.map((order, index) => {
     const statusClass = `status-${order.status}`
     const typeLabel = {
       'container_export': '컨수출',
@@ -938,10 +984,62 @@ function renderOrderList() {
   }).join('')
   
   listContainer.innerHTML = `
-    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-      ${ordersHtml || '<div class="col-span-full text-center text-gray-500 py-8">오더가 없습니다</div>'}
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[calc(100vh-200px)]">
+      <!-- 좌측: 텍스트 목록 -->
+      <div class="lg:col-span-2 border-r pr-4 overflow-y-auto">
+        <div class="mb-3 p-3 bg-blue-50 rounded-lg">
+          <h3 class="font-bold text-sm flex items-center">
+            <i class="fas fa-list mr-2"></i>
+            오더 목록 (${state.orders.length}건)
+          </h3>
+        </div>
+        ${textList}
+      </div>
+      
+      <!-- 우측: 상세 카드 -->
+      <div class="lg:col-span-3 overflow-y-auto" id="orderDetailsPanel">
+        <div class="text-center py-20 text-gray-400">
+          <i class="fas fa-hand-pointer text-6xl mb-4"></i>
+          <p>왼쪽 목록에서 오더를 선택하세요</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 숨겨진 카드 데이터 -->
+    <div id="orderCardsData" style="display: none;">
+      ${ordersHtml}
     </div>
   `
+  
+  // 첫 번째 오더 자동 선택
+  if (state.orders.length > 0) {
+    setTimeout(() => selectOrder(0), 100)
+  }
+}
+
+// 오더 선택 함수
+function selectOrder(index) {
+  const panel = document.getElementById('orderDetailsPanel')
+  const cardsData = document.getElementById('orderCardsData')
+  
+  if (!panel || !cardsData) return
+  
+  const cards = cardsData.children
+  if (cards[index]) {
+    panel.innerHTML = cards[index].outerHTML
+    
+    // 모든 항목의 하이라이트 제거
+    document.querySelectorAll('#orderListContainer .border-l-4').forEach(item => {
+      item.classList.remove('bg-blue-100', 'border-blue-500')
+    })
+    
+    // 선택된 항목 하이라이트
+    const selectedItem = document.querySelectorAll('#orderListContainer .border-l-4')[index]
+    if (selectedItem) {
+      selectedItem.classList.add('bg-blue-100', 'border-blue-500')
+      selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }
 }
 
 function renderCreateOrderPage() {
