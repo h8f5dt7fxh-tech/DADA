@@ -2363,37 +2363,57 @@ function renderInputContent() {
 
 function renderTextInputMode() {
   return `
-    <div class="mb-6">
-      <label class="block mb-2 font-semibold">오더 타입</label>
-      <select id="newOrderType" onchange="updateTemplateButton()" class="w-full px-3 py-2 border rounded">
-        <option value="container_export">컨테이너 수출</option>
-        <option value="container_import">컨테이너 수입</option>
-        <option value="bulk">벌크화물</option>
-        <option value="lcl">LCL</option>
-      </select>
+    <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+      <p class="text-sm text-gray-700 mb-2">
+        <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+        <strong>사용 방법:</strong> 메모장처럼 자유롭게 입력하세요. 빈 줄로 오더를 구분하며, 실시간으로 파싱됩니다.
+      </p>
     </div>
     
-    <div class="mb-4">
-      <button onclick="copyOrderTemplate()" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center justify-center">
-        <i class="fas fa-copy mr-2"></i>
-        <span id="templateButtonText">컨테이너 수출 양식 복사</span>
-      </button>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- 입력 영역 -->
+      <div>
+        <label class="block mb-2 font-semibold text-lg">
+          <i class="fas fa-edit mr-2"></i>오더 메모
+        </label>
+        <textarea id="orderTextInput" rows="30" 
+                  class="w-full h-[calc(100vh-280px)] px-4 py-3 border-2 rounded-lg font-mono text-sm focus:border-blue-500 focus:outline-none resize-none"
+                    oninput="updateOrderPreview()"
+                  placeholder="메모장처럼 자유롭게 입력하세요...
+
+수출
+청구처 : 스마트해운항공
+배차 : 다원
+진행일시 : 2026.01.09
+화주 : ISP COMPANY
+BKG : SNKO010260102386
+선사 : SKR
+모선 : NAGOYA TRADER 2602W
+상차지 / 하차지 : 평택 / 평택
+
+수입
+청구처 : 선인터내셔날
+화주 : 에스엔엠코퍼레이션
+BL : SNLGZGKL000014
+상차지 / 하차지 : BIT / BIT"></textarea>
+      </div>
+      
+      <!-- 미리보기 영역 -->
+      <div>
+        <label class="block mb-2 font-semibold text-lg">
+          <i class="fas fa-eye mr-2"></i>오더 미리보기 <span class="text-sm text-gray-500" id="orderCount"></span>
+        </label>
+        <div id="orderPreview" class="border-2 border-gray-200 rounded-lg h-[calc(100vh-280px)] overflow-y-auto bg-gray-50 p-4 space-y-4"></div>
+        
+        <div class="mt-4 text-center">
+          <button onclick="bulkCreateOrders()" 
+                  class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg disabled:bg-gray-400"
+                  id="createOrdersBtn" disabled>
+            <i class="fas fa-check-circle mr-2"></i><span id="createBtnText">오더 생성</span>
+          </button>
+        </div>
+      </div>
     </div>
-    
-    <div class="mb-6">
-      <label class="block mb-2 font-semibold">텍스트 붙여넣기 (자동 파싱)</label>
-      <textarea id="orderTextInput" rows="15" 
-                class="w-full px-3 py-2 border rounded font-mono text-sm"
-                placeholder="오더 정보를 붙여넣으세요..."></textarea>
-    </div>
-    
-    <div class="flex space-x-4">
-      <button onclick="parseAndPreviewOrder()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-        <i class="fas fa-magic mr-2"></i>파싱 및 미리보기
-      </button>
-    </div>
-    
-    <div id="orderPreview" class="mt-6"></div>
   `
 }
 
@@ -2728,6 +2748,367 @@ function viewOrderDetail(id) {
   `
   
   document.body.appendChild(modal)
+}
+
+// 빠른 파싱 (여러 오더)
+async function quickParseOrders() {
+  const text = document.getElementById('orderTextInput').value
+  
+  if (!text.trim()) {
+    alert('텍스트를 입력해주세요.')
+    return
+  }
+  
+  // 빈 줄로 오더 구분
+  const blocks = text.split(/\n\s*\n/).filter(b => b.trim())
+  
+  if (blocks.length === 0) {
+    alert('오더 정보를 찾을 수 없습니다.')
+    return
+  }
+  
+  const preview = document.getElementById('orderPreview')
+  preview.innerHTML = `
+    <div class="border-t pt-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold">
+          <i class="fas fa-list mr-2"></i>파싱된 오더 (${blocks.length}건)
+        </h3>
+        <button onclick="confirmCreateMultipleOrders()" 
+                class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+          <i class="fas fa-check mr-2"></i>전체 생성
+        </button>
+      </div>
+      
+      <div class="space-y-4" id="parsedOrdersList"></div>
+    </div>
+  `
+  
+  const parsedOrders = []
+  const listContainer = document.getElementById('parsedOrdersList')
+  
+  blocks.forEach((block, index) => {
+    // 오더 타입 자동 감지
+    const firstLine = block.trim().split('\\n')[0].trim()
+    let orderType = 'container_export'
+    
+    if (firstLine === '수출') orderType = 'container_export'
+    else if (firstLine === '수입') orderType = 'container_import'
+    else if (firstLine === 'LCL') orderType = 'lcl'
+    else if (firstLine === '벌크') orderType = 'bulk'
+    
+    const parsed = parseOrderText(block, orderType)
+    parsedOrders.push(parsed)
+    
+    // 카드 형식으로 표시
+    const typeLabel = {
+      'container_export': '컨수출',
+      'container_import': '컨수입',
+      'bulk': '벌크',
+      'lcl': 'LCL'
+    }[orderType]
+    
+    const typeColor = {
+      'container_export': 'bg-blue-100 text-blue-800',
+      'container_import': 'bg-green-100 text-green-800',
+      'bulk': 'bg-orange-100 text-orange-800',
+      'lcl': 'bg-purple-100 text-purple-800'
+    }[orderType]
+    
+    const card = document.createElement('div')
+    card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow'
+    card.innerHTML = `
+      <div class="flex items-center justify-between mb-3 pb-2 border-b">
+        <span class="px-3 py-1 rounded-full text-xs font-bold ${typeColor}">${typeLabel}</span>
+        <span class="text-sm text-gray-500">오더 #${index + 1}</span>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <span class="text-gray-500">청구처:</span>
+          <span class="font-semibold ml-1">${parsed.billing_company || '-'}</span>
+        </div>
+        <div>
+          <span class="text-gray-500">화주:</span>
+          <span class="font-semibold ml-1">${parsed.shipper || '-'}</span>
+        </div>
+        <div>
+          <span class="text-gray-500">작업일시:</span>
+          <span class="font-semibold ml-1">${parsed.work_datetime || '-'}</span>
+        </div>
+        <div>
+          <span class="text-gray-500">BKG/BL:</span>
+          <span class="font-mono text-xs font-semibold ml-1">${parsed.booking_number || parsed.bl_number || '-'}</span>
+        </div>
+        ${parsed.work_site ? `
+        <div class="col-span-2">
+          <span class="text-gray-500">작업지:</span>
+          <span class="font-semibold ml-1">${parsed.work_site}</span>
+        </div>
+        ` : ''}
+      </div>
+    `
+    
+    listContainer.appendChild(card)
+  })
+  
+  // 전역 변수에 저장
+  window.parsedOrdersCache = parsedOrders
+}
+
+async function confirmCreateMultipleOrders() {
+  if (!window.parsedOrdersCache || window.parsedOrdersCache.length === 0) {
+    alert('파싱된 오더가 없습니다.')
+    return
+  }
+  
+  const orders = window.parsedOrdersCache
+  
+  if (!confirm(`${orders.length}건의 오더를 생성하시겠습니까?`)) {
+    return
+  }
+  
+  const preview = document.getElementById('orderPreview')
+  preview.innerHTML = `
+    <div class="border-t pt-6 text-center">
+      <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+      <p class="text-gray-600">오더 생성 중...</p>
+    </div>
+  `
+  
+  let success = 0
+  let failed = 0
+  const errors = []
+  
+  for (let i = 0; i < orders.length; i++) {
+    try {
+      await axios.post('/api/orders', orders[i])
+      success++
+    } catch (error) {
+      failed++
+      errors.push(`오더 #${i + 1}: ${error.response?.data?.error || error.message}`)
+    }
+  }
+  
+  preview.innerHTML = `
+    <div class="border-t pt-6">
+      <div class="bg-white rounded-lg p-6 text-center">
+        <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
+        <h3 class="text-2xl font-bold mb-4">오더 생성 완료</h3>
+        <div class="text-lg mb-6">
+          <span class="text-green-600 font-bold">${success}건 성공</span>
+          ${failed > 0 ? `<span class="text-red-600 font-bold ml-4">${failed}건 실패</span>` : ''}
+        </div>
+        ${errors.length > 0 ? `
+          <div class="text-left bg-red-50 p-4 rounded mb-4">
+            <h4 class="font-bold text-red-800 mb-2">실패 내역:</h4>
+            <ul class="text-sm text-red-700 space-y-1">
+              ${errors.map(e => `<li>• ${e}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+        <button onclick="changePage('orders')" 
+                class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <i class="fas fa-list mr-2"></i>오더 목록으로
+        </button>
+      </div>
+    </div>
+  `
+  
+  // 캐시 초기화
+  window.parsedOrdersCache = null
+  document.getElementById('orderTextInput').value = ''
+}
+
+// 실시간 오더 미리보기
+let updatePreviewTimer = null
+function updateOrderPreview() {
+  // 디바운스 처리 (500ms 대기)
+  if (updatePreviewTimer) clearTimeout(updatePreviewTimer)
+  
+  updatePreviewTimer = setTimeout(() => {
+    const textarea = document.getElementById('orderTextInput')
+    const preview = document.getElementById('orderPreview')
+    const countSpan = document.getElementById('orderCount')
+    const createBtn = document.getElementById('createOrdersBtn')
+    
+    if (!textarea || !preview) return
+    
+    const text = textarea.value.trim()
+    
+    if (!text) {
+      preview.innerHTML = `
+        <div class="text-center text-gray-400 py-12">
+          <i class="fas fa-inbox text-6xl mb-3"></i>
+          <p>왼쪽에 오더를 입력하면<br>실시간으로 미리보기가 표시됩니다</p>
+        </div>
+      `
+      countSpan.textContent = ''
+      createBtn.disabled = true
+      window.parsedOrdersCache = []
+      return
+    }
+    
+    // 빈 줄로 오더 구분
+    const blocks = text.split(/\\n\\s*\\n/).filter(b => b.trim())
+    
+    if (blocks.length === 0) {
+      preview.innerHTML = '<div class="text-gray-500 text-center py-4">오더 정보를 입력해주세요</div>'
+      countSpan.textContent = ''
+      createBtn.disabled = true
+      window.parsedOrdersCache = []
+      return
+    }
+    
+    const parsedOrders = []
+    let previewHTML = ''
+    
+    blocks.forEach((block, index) => {
+      // 오더 타입 자동 감지
+      const firstLine = block.trim().split('\\n')[0].trim()
+      let orderType = 'container_export'
+      
+      if (firstLine === '수출') orderType = 'container_export'
+      else if (firstLine === '수입') orderType = 'container_import'
+      else if (firstLine === 'LCL') orderType = 'lcl'
+      else if (firstLine === '벌크') orderType = 'bulk'
+      
+      const parsed = parseOrderText(block, orderType)
+      parsedOrders.push(parsed)
+      
+      // 카드 형식으로 표시
+      const typeLabel = {
+        'container_export': '컨수출',
+        'container_import': '컨수입',
+        'bulk': '벌크',
+        'lcl': 'LCL'
+      }[orderType]
+      
+      const typeColor = {
+        'container_export': 'bg-blue-100 text-blue-800',
+        'container_import': 'bg-green-100 text-green-800',
+        'bulk': 'bg-orange-100 text-orange-800',
+        'lcl': 'bg-purple-100 text-purple-800'
+      }[orderType]
+      
+      previewHTML += `
+        <div class="bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors">
+          <div class="flex items-center justify-between mb-3 pb-2 border-b">
+            <span class="px-3 py-1 rounded-full text-xs font-bold ${typeColor}">${typeLabel}</span>
+            <span class="text-sm text-gray-500">#${index + 1}</span>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <span class="text-gray-500">청구처:</span>
+              <span class="font-semibold ml-1">${parsed.billing_company || '-'}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">화주:</span>
+              <span class="font-semibold ml-1">${parsed.shipper || '-'}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">작업일시:</span>
+              <span class="font-semibold ml-1">${parsed.work_datetime || '-'}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">BKG/BL:</span>
+              <span class="font-mono text-xs font-semibold ml-1">${parsed.booking_number || parsed.bl_number || '-'}</span>
+            </div>
+            ${parsed.work_site ? `
+            <div class="col-span-2">
+              <span class="text-gray-500">작업지:</span>
+              <span class="font-semibold ml-1 text-xs">${parsed.work_site}</span>
+            </div>
+            ` : ''}
+            ${parsed.dispatch_company ? `
+            <div>
+              <span class="text-gray-500">배차:</span>
+              <span class="font-semibold ml-1">${parsed.dispatch_company}</span>
+            </div>
+            ` : ''}
+            ${parsed.loading_location && parsed.loading_location !== '—' ? `
+            <div class="col-span-2">
+              <span class="text-gray-500">상차지:</span>
+              <span class="font-semibold ml-1 text-xs">${parsed.loading_location}</span>
+            </div>
+            ` : ''}
+            ${parsed.unloading_location && parsed.unloading_location !== '—' ? `
+            <div class="col-span-2">
+              <span class="text-gray-500">하차지:</span>
+              <span class="font-semibold ml-1 text-xs">${parsed.unloading_location}</span>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+      `
+    })
+    
+    preview.innerHTML = previewHTML
+    countSpan.textContent = `(${blocks.length}건)`
+    createBtn.disabled = blocks.length === 0
+    document.getElementById('createBtnText').textContent = `오더 ${blocks.length}건 생성`
+    
+    // 전역 변수에 저장
+    window.parsedOrdersCache = parsedOrders
+  }, 500)
+}
+
+// 일괄 오더 생성
+async function bulkCreateOrders() {
+  if (!window.parsedOrdersCache || window.parsedOrdersCache.length === 0) {
+    alert('파싱된 오더가 없습니다.')
+    return
+  }
+  
+  const orders = window.parsedOrdersCache
+  
+  if (!confirm(`${orders.length}건의 오더를 생성하시겠습니까?`)) {
+    return
+  }
+  
+  const btn = document.getElementById('createOrdersBtn')
+  const btnText = document.getElementById('createBtnText')
+  const originalText = btnText.textContent
+  
+  btn.disabled = true
+  btnText.textContent = '생성 중...'
+  
+  let successCount = 0
+  let failCount = 0
+  
+  for (let i = 0; i < orders.length; i++) {
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orders[i])
+      })
+      
+      if (response.ok) {
+        successCount++
+        btnText.textContent = `생성 중... (${successCount}/${orders.length})`
+      } else {
+        failCount++
+      }
+    } catch (error) {
+      failCount++
+    }
+  }
+  
+  btn.disabled = false
+  btnText.textContent = originalText
+  
+  if (failCount === 0) {
+    alert(`✅ ${successCount}건의 오더가 생성되었습니다!`)
+    // 입력 초기화
+    document.getElementById('orderTextInput').value = ''
+    updateOrderPreview()
+    // 오더 목록으로 이동
+    changePage('orders')
+  } else {
+    alert(`⚠️ 생성 완료: ${successCount}건 성공, ${failCount}건 실패`)
+  }
 }
 
 function parseAndPreviewOrder() {
