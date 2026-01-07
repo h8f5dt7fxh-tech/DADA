@@ -726,15 +726,23 @@ function renderOrderCard(order) {
     'lcl': 'bg-yellow-100 text-yellow-800 border-yellow-300'
   }[order.order_type]
   
+  // 배차/차량정보 없으면 배경색 변경
+  const hasDispatch = order.dispatch_company && order.dispatch_company.trim() !== ''
+  const hasVehicle = order.vehicle_info && order.vehicle_info.trim() !== ''
+  const needsAssignment = !hasDispatch || !hasVehicle
+  const bgColor = needsAssignment ? 'bg-red-50' : 'bg-white'
+  const borderColor = needsAssignment ? 'border-red-400' : typeColor.split(' ')[2]
+  
   const totalBilling = (order.billings || []).reduce((sum, b) => sum + parseFloat(b.amount || 0), 0)
   const totalPayment = (order.payments || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
   
   return `
-    <div class="border-l-4 ${typeColor} bg-white p-3 rounded shadow-sm mb-2 cursor-pointer hover:shadow-md transition" 
+    <div class="border-l-4 ${typeColor} ${bgColor} p-3 rounded shadow-sm mb-2 cursor-pointer hover:shadow-md transition border ${borderColor}" 
          onclick="viewOrderDetail(${order.id})">
       <div class="flex items-start justify-between mb-2">
         <span class="px-2 py-1 text-xs font-semibold rounded ${typeColor}">
           ${typeLabel}
+          ${needsAssignment ? '<i class="fas fa-exclamation-triangle ml-1 text-red-600"></i>' : ''}
         </span>
         <span class="text-xs text-gray-500">${formatTime(order.work_datetime)}</span>
       </div>
@@ -745,8 +753,18 @@ function renderOrderCard(order) {
       <div class="text-xs text-gray-600 mb-1">
         <i class="fas fa-user mr-1"></i>${order.shipper}
       </div>
-      ${order.dispatch_company ? `<div class="text-xs text-gray-600 mb-1"><i class="fas fa-truck mr-1"></i>${order.dispatch_company}</div>` : ''}
-      ${order.vehicle_info ? `<div class="text-xs text-gray-500"><i class="fas fa-car mr-1"></i>${order.vehicle_info}</div>` : ''}
+      ${order.order_type === 'lcl' ? `
+        <div class="text-xs text-gray-600 mb-1">
+          <i class="fas fa-arrow-up mr-1 text-green-600"></i>상차: ${order.loading_location || '-'}
+        </div>
+        <div class="text-xs text-gray-600 mb-1">
+          <i class="fas fa-arrow-down mr-1 text-blue-600"></i>하차: ${order.unloading_location || '-'}
+        </div>
+      ` : `
+        ${order.work_site ? `<div class="text-xs text-gray-600 mb-1"><i class="fas fa-map-marker-alt mr-1"></i>${order.work_site}</div>` : ''}
+      `}
+      ${hasDispatch ? `<div class="text-xs text-gray-600 mb-1"><i class="fas fa-truck mr-1 text-green-600"></i>${order.dispatch_company}</div>` : '<div class="text-xs text-red-600 mb-1"><i class="fas fa-truck mr-1"></i>배차 미지정</div>'}
+      ${hasVehicle ? `<div class="text-xs text-gray-500"><i class="fas fa-car mr-1 text-green-600"></i>${order.vehicle_info}</div>` : '<div class="text-xs text-red-600"><i class="fas fa-car mr-1"></i>차량 미배정</div>'}
     </div>
   `
 }
@@ -818,20 +836,38 @@ function renderOrderList() {
       'lcl': 'LCL'
     }[order.order_type]
     
+    // 배차/차량정보 체크
+    const hasDispatch = order.dispatch_company && order.dispatch_company.trim() !== ''
+    const hasVehicle = order.vehicle_info && order.vehicle_info.trim() !== ''
+    const needsAssignment = !hasDispatch || !hasVehicle
+    const rowBgClass = needsAssignment ? 'bg-red-50' : ''
+    
     const totalBilling = (order.billings || []).reduce((sum, b) => sum + parseFloat(b.amount || 0), 0)
     const totalPayment = (order.payments || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
     const profit = totalBilling - totalPayment
     
+    // LCL일 때는 작업지 대신 상하차지 강조
+    const workSiteDisplay = order.order_type === 'lcl' 
+      ? '<span class="text-gray-400 text-xs">-</span>'
+      : (order.work_site || '-')
+    
+    const loadingUnloadingDisplay = order.order_type === 'lcl'
+      ? `<span class="font-semibold text-blue-600">${order.loading_location || '-'}</span> → <span class="font-semibold text-green-600">${order.unloading_location || '-'}</span>`
+      : `${order.loading_location || '-'} → ${order.unloading_location || '-'}`
+    
     return `
-      <tr class="${statusClass} hover:bg-gray-100 cursor-pointer" onclick="viewOrderDetail(${order.id})">
-        <td class="px-4 py-3 border-b">${typeLabel}</td>
+      <tr class="${statusClass} ${rowBgClass} hover:bg-gray-100 cursor-pointer" onclick="viewOrderDetail(${order.id})">
+        <td class="px-4 py-3 border-b">
+          ${typeLabel}
+          ${needsAssignment ? '<i class="fas fa-exclamation-triangle ml-1 text-red-600" title="배차/차량 미배정"></i>' : ''}
+        </td>
         <td class="px-4 py-3 border-b">${formatDate(order.work_datetime)}</td>
         <td class="px-4 py-3 border-b">${order.billing_company}</td>
         <td class="px-4 py-3 border-b">${order.shipper}</td>
-        <td class="px-4 py-3 border-b">${order.work_site || '-'}</td>
+        <td class="px-4 py-3 border-b">${workSiteDisplay}</td>
         <td class="px-4 py-3 border-b">${order.booking_number || order.bl_number || order.order_no || '-'}</td>
-        <td class="px-4 py-3 border-b">${order.loading_location || '-'} → ${order.unloading_location || '-'}</td>
-        <td class="px-4 py-3 border-b">${order.dispatch_company || '-'}</td>
+        <td class="px-4 py-3 border-b">${loadingUnloadingDisplay}</td>
+        <td class="px-4 py-3 border-b ${!hasDispatch ? 'text-red-600 font-semibold' : ''}">${order.dispatch_company || '미지정'}</td>
         <td class="px-4 py-3 border-b text-right">${totalBilling.toLocaleString()}원</td>
         <td class="px-4 py-3 border-b text-right">${totalPayment.toLocaleString()}원</td>
         <td class="px-4 py-3 border-b text-right font-semibold ${profit >= 0 ? 'text-blue-600' : 'text-red-600'}">
@@ -840,6 +876,7 @@ function renderOrderList() {
         <td class="px-4 py-3 border-b">
           ${order.weighing_required ? '<i class="fas fa-balance-scale text-yellow-600" title="계근"></i>' : ''}
           ${order.status === 'completed' ? '<i class="fas fa-check-circle text-green-600"></i>' : ''}
+          ${!hasVehicle ? '<i class="fas fa-car text-red-600 ml-1" title="차량 미배정"></i>' : ''}
         </td>
       </tr>
     `
