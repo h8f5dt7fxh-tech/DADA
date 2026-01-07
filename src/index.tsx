@@ -1699,6 +1699,158 @@ app.post('/api/quotations', async (c) => {
   }
 })
 
+// 견적 일괄 등록 (여러 개 한 번에)
+app.post('/api/quotations/bulk', async (c) => {
+  const { env } = c
+  
+  try {
+    const { quotations } = await c.req.json()
+    
+    if (!Array.isArray(quotations) || quotations.length === 0) {
+      return c.json({ error: '견적 데이터 배열이 필요합니다' }, 400)
+    }
+    
+    let success = 0
+    let failed = 0
+    const errors: string[] = []
+    
+    for (const quote of quotations) {
+      try {
+        const { billing_company, shipper_name, work_site, route_type, container_size, price, memo } = quote
+        
+        // 필수 필드 검증
+        if (!billing_company || !shipper_name || !work_site || !route_type || !price) {
+          failed++
+          errors.push(`누락된 필드: ${JSON.stringify(quote)}`)
+          continue
+        }
+        
+        await env.DB.prepare(`
+          INSERT INTO quotations (billing_company, shipper_name, work_site, route_type, container_size, price, memo)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(billing_company, shipper_name, work_site, route_type, container_size || null, price, memo || null).run()
+        
+        success++
+      } catch (error: any) {
+        failed++
+        errors.push(`${quote.billing_company}-${quote.shipper_name}: ${error.message}`)
+      }
+    }
+    
+    return c.json({ 
+      success: true,
+      total: quotations.length,
+      inserted: success,
+      failed,
+      errors: errors.length > 0 ? errors.slice(0, 10) : []  // 최대 10개 에러만 반환
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 텍스트 자동 파싱 후 일괄 등록
+app.post('/api/quotations/parse-text', async (c) => {
+  const { env } = c
+  
+  try {
+    const { text } = await c.req.json()
+    
+    if (!text || typeof text !== 'string') {
+      return c.json({ error: '텍스트가 필요합니다' }, 400)
+    }
+    
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l)
+    const quotations: any[] = []
+    
+    // 텍스트 파싱: 탭이나 여러 공백으로 구분
+    // 형식: 청구처\t화주\t작업지\t노선\t컨테이너사이즈\t가격\t메모
+    // 또는: 청구처  화주  작업지  노선  가격
+    for (const line of lines) {
+      // 탭 또는 2개 이상의 공백으로 분리
+      const parts = line.split(/\t|  +/).map(p => p.trim()).filter(p => p)
+      
+      if (parts.length >= 5) {  // 최소 청구처, 화주, 작업지, 노선, 가격
+        const quote: any = {
+          billing_company: parts[0],
+          shipper_name: parts[1],
+          work_site: parts[2],
+          route_type: parts[3],
+          price: null,
+          container_size: null,
+          memo: null
+        }
+        
+        // 가격 찾기 (숫자만 있는 필드)
+        for (let i = 4; i < parts.length; i++) {
+          const cleaned = parts[i].replace(/[,원]/g, '')
+          if (/^\d+$/.test(cleaned)) {
+            quote.price = parseInt(cleaned)
+            // 가격 앞 필드가 컨테이너 사이즈일 수 있음
+            if (i > 4 && /^(20|40)(GP|HC|HQ|BK|FR|OT)$/i.test(parts[i-1])) {
+              quote.container_size = parts[i-1].toUpperCase()
+            }
+            // 가격 뒤 필드는 메모
+            if (i < parts.length - 1) {
+              quote.memo = parts.slice(i + 1).join(' ')
+            }
+            break
+          }
+        }
+        
+        if (quote.price) {
+          quotations.push(quote)
+        }
+      }
+    }
+    
+    if (quotations.length === 0) {
+      return c.json({ 
+        error: '파싱 가능한 데이터가 없습니다', 
+        hint: '형식: 청구처  화주  작업지  노선  가격 (탭이나 공백으로 구분)'
+      }, 400)
+    }
+    
+    // 일괄 등록
+    let success = 0
+    let failed = 0
+    const errors: string[] = []
+    
+    for (const quote of quotations) {
+      try {
+        await env.DB.prepare(`
+          INSERT INTO quotations (billing_company, shipper_name, work_site, route_type, container_size, price, memo)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          quote.billing_company, 
+          quote.shipper_name, 
+          quote.work_site, 
+          quote.route_type, 
+          quote.container_size, 
+          quote.price, 
+          quote.memo
+        ).run()
+        
+        success++
+      } catch (error: any) {
+        failed++
+        errors.push(`${quote.billing_company}-${quote.shipper_name}: ${error.message}`)
+      }
+    }
+    
+    return c.json({ 
+      success: true,
+      parsed: quotations.length,
+      inserted: success,
+      failed,
+      errors: errors.length > 0 ? errors.slice(0, 10) : [],
+      sample: quotations.slice(0, 3)  // 처음 3개 샘플 보여주기
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // 견적 수정
 app.put('/api/quotations/:id', async (c) => {
   const { env } = c
