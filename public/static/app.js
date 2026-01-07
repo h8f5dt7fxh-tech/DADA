@@ -584,7 +584,7 @@ async function deleteTodo(id) {
 
 function renderNavigation() {
   return `
-    <nav class="bg-white shadow-sm border-b">
+    <nav class="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
       <div class="max-w-7xl mx-auto px-4">
         <div class="flex items-center justify-between h-16">
           <!-- 데스크톱 네비게이션 -->
@@ -623,6 +623,9 @@ function renderNavigation() {
         </div>
       </div>
     </nav>
+    
+    <!-- 상단바 고정으로 인한 공간 확보 -->
+    <div style="height: 64px;"></div>
     
     <!-- 모바일 메뉴 오버레이 -->
     <div id="menuOverlay" class="menu-overlay" onclick="toggleMobileMenu()"></div>
@@ -826,7 +829,7 @@ function renderOrderList() {
     return
   }
   
-  // 일별 뷰: 테이블 형식
+  // 일별 뷰: 깔끔한 카드 형식
   const ordersHtml = state.orders.map(order => {
     const statusClass = `status-${order.status}`
     const typeLabel = {
@@ -836,11 +839,18 @@ function renderOrderList() {
       'lcl': 'LCL'
     }[order.order_type]
     
+    const typeColor = {
+      'container_export': 'bg-blue-100 text-blue-800',
+      'container_import': 'bg-green-100 text-green-800',
+      'bulk': 'bg-orange-100 text-orange-800',
+      'lcl': 'bg-purple-100 text-purple-800'
+    }[order.order_type]
+    
     // 배차/차량정보 체크
     const hasDispatch = order.dispatch_company && order.dispatch_company.trim() !== ''
     const hasVehicle = order.vehicle_info && order.vehicle_info.trim() !== ''
     const needsAssignment = !hasDispatch || !hasVehicle
-    const rowBgClass = needsAssignment ? 'bg-red-50' : ''
+    const cardBorderClass = needsAssignment ? 'border-red-400 border-2' : 'border-gray-200'
     
     const totalBilling = (order.billings || []).reduce((sum, b) => sum + parseFloat(b.amount || 0), 0)
     const totalPayment = (order.payments || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
@@ -848,63 +858,88 @@ function renderOrderList() {
     
     // LCL일 때는 작업지 대신 상하차지 강조
     const workSiteDisplay = order.order_type === 'lcl' 
-      ? '<span class="text-gray-400 text-xs">-</span>'
-      : (order.work_site || '-')
-    
-    const loadingUnloadingDisplay = order.order_type === 'lcl'
-      ? `<span class="font-semibold text-blue-600">${order.loading_location || '-'}</span> → <span class="font-semibold text-green-600">${order.unloading_location || '-'}</span>`
-      : `${order.loading_location || '-'} → ${order.unloading_location || '-'}`
+      ? `<div class="text-sm">
+           <span class="text-blue-600 font-semibold">상차: ${order.loading_location || '미정'}</span><br>
+           <span class="text-green-600 font-semibold">하차: ${order.unloading_location || '미정'}</span>
+         </div>`
+      : `<div class="text-sm font-medium">${order.work_site || '-'}</div>`
     
     return `
-      <tr class="${statusClass} ${rowBgClass} hover:bg-gray-100 cursor-pointer" onclick="viewOrderDetail(${order.id})">
-        <td class="px-4 py-3 border-b">
-          ${typeLabel}
-          ${needsAssignment ? '<i class="fas fa-exclamation-triangle ml-1 text-red-600" title="배차/차량 미배정"></i>' : ''}
-        </td>
-        <td class="px-4 py-3 border-b">${formatDate(order.work_datetime)}</td>
-        <td class="px-4 py-3 border-b">${order.billing_company}</td>
-        <td class="px-4 py-3 border-b">${order.shipper}</td>
-        <td class="px-4 py-3 border-b">${workSiteDisplay}</td>
-        <td class="px-4 py-3 border-b">${order.booking_number || order.bl_number || order.order_no || '-'}</td>
-        <td class="px-4 py-3 border-b">${loadingUnloadingDisplay}</td>
-        <td class="px-4 py-3 border-b ${!hasDispatch ? 'text-red-600 font-semibold' : ''}">${order.dispatch_company || '미지정'}</td>
-        <td class="px-4 py-3 border-b text-right">${totalBilling.toLocaleString()}원</td>
-        <td class="px-4 py-3 border-b text-right">${totalPayment.toLocaleString()}원</td>
-        <td class="px-4 py-3 border-b text-right font-semibold ${profit >= 0 ? 'text-blue-600' : 'text-red-600'}">
-          ${profit.toLocaleString()}원
-        </td>
-        <td class="px-4 py-3 border-b">
-          ${order.weighing_required ? '<i class="fas fa-balance-scale text-yellow-600" title="계근"></i>' : ''}
-          ${order.status === 'completed' ? '<i class="fas fa-check-circle text-green-600"></i>' : ''}
-          ${!hasVehicle ? '<i class="fas fa-car text-red-600 ml-1" title="차량 미배정"></i>' : ''}
-        </td>
-      </tr>
+      <div class="bg-white rounded-lg border ${cardBorderClass} p-4 hover:shadow-lg transition-shadow cursor-pointer ${statusClass}" 
+           onclick="viewOrderDetail(${order.id})">
+        <!-- 상단: 타입 + 경고 + 작업일시 -->
+        <div class="flex items-center justify-between mb-3 pb-2 border-b">
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-full text-xs font-bold ${typeColor}">${typeLabel}</span>
+            ${needsAssignment ? '<i class="fas fa-exclamation-triangle text-red-600 text-lg" title="배차/차량 미배정"></i>' : ''}
+            ${order.weighing_required ? '<i class="fas fa-balance-scale text-yellow-600" title="계근"></i>' : ''}
+            ${order.status === 'completed' ? '<i class="fas fa-check-circle text-green-600"></i>' : ''}
+          </div>
+          <div class="text-sm font-semibold text-gray-700">
+            <i class="far fa-clock mr-1"></i>${formatDate(order.work_datetime)}
+          </div>
+        </div>
+        
+        <!-- 중단: 주요 정보 그리드 -->
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <!-- 왼쪽 -->
+          <div class="space-y-2">
+            <div>
+              <div class="text-xs text-gray-500">청구처</div>
+              <div class="font-bold text-gray-900">${order.billing_company}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">화주</div>
+              <div class="font-semibold text-gray-700">${order.shipper}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">${order.order_type === 'lcl' ? '상하차지' : '작업지'}</div>
+              ${workSiteDisplay}
+            </div>
+          </div>
+          
+          <!-- 오른쪽 -->
+          <div class="space-y-2">
+            <div>
+              <div class="text-xs text-gray-500">BKG/BL/NO</div>
+              <div class="font-mono text-sm font-semibold text-blue-600">${order.booking_number || order.bl_number || order.order_no || '-'}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">배차업체</div>
+              <div class="font-semibold ${!hasDispatch ? 'text-red-600' : 'text-gray-800'}">
+                ${order.dispatch_company || '⚠️ 미지정'}
+                ${!hasVehicle ? '<span class="text-xs text-red-600 ml-1">(차량 미배정)</span>' : ''}
+              </div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">차량정보</div>
+              <div class="text-sm ${!hasVehicle ? 'text-red-600' : 'text-gray-700'}">${order.vehicle_info || '미배정'}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 하단: 금액 정보 -->
+        <div class="grid grid-cols-3 gap-2 pt-3 border-t">
+          <div class="text-center">
+            <div class="text-xs text-gray-500">청구</div>
+            <div class="font-bold text-blue-600">${totalBilling.toLocaleString()}원</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xs text-gray-500">하불</div>
+            <div class="font-bold text-orange-600">${totalPayment.toLocaleString()}원</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xs text-gray-500">수익</div>
+            <div class="font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}">${profit.toLocaleString()}원</div>
+          </div>
+        </div>
+      </div>
     `
   }).join('')
   
   listContainer.innerHTML = `
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="w-full">
-        <thead class="bg-gray-100">
-          <tr>
-            <th class="px-4 py-3 text-left">구분</th>
-            <th class="px-4 py-3 text-left">작업일시</th>
-            <th class="px-4 py-3 text-left">청구처</th>
-            <th class="px-4 py-3 text-left">화주</th>
-            <th class="px-4 py-3 text-left">작업지</th>
-            <th class="px-4 py-3 text-left">BKG/BL/NO</th>
-            <th class="px-4 py-3 text-left">상하차지</th>
-            <th class="px-4 py-3 text-left">배차업체</th>
-            <th class="px-4 py-3 text-right">청구</th>
-            <th class="px-4 py-3 text-right">하불</th>
-            <th class="px-4 py-3 text-right">수익</th>
-            <th class="px-4 py-3 text-center">상태</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${ordersHtml || '<tr><td colspan="12" class="px-4 py-8 text-center text-gray-500">오더가 없습니다</td></tr>'}
-        </tbody>
-      </table>
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+      ${ordersHtml || '<div class="col-span-full text-center text-gray-500 py-8">오더가 없습니다</div>'}
     </div>
   `
 }
