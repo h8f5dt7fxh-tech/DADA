@@ -3155,8 +3155,8 @@ function updateOrderPreview() {
       return
     }
     
-    // 빈 줄로 오더 구분
-    const blocks = text.split(/\n\s*\n/).filter(b => b.trim())
+    // 빈 줄로 오더 구분 (2개 이상의 연속된 줄바꿈)
+    const blocks = text.split(/\n\n+/).filter(b => b.trim())
     
     if (blocks.length === 0) {
       preview.innerHTML = '<div class="text-gray-500 text-center py-4">오더 정보를 입력해주세요</div>'
