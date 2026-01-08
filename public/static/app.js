@@ -995,8 +995,16 @@ ${(order.remarks || []).length > 0 ? `\n📝 비고:\n${(order.remarks || []).ma
   
   listContainer.innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[calc(100vh-200px)]">
-      <!-- 좌측: 텍스트 목록 -->
-      <div class="lg:col-span-2 border-r pr-4 overflow-y-auto">
+      <!-- 좌측: 상세 정보 -->
+      <div class="lg:col-span-3 border-r pr-4 overflow-y-auto" id="orderDetailsPanel">
+        <div class="text-center py-20 text-gray-400">
+          <i class="fas fa-hand-pointer text-6xl mb-4"></i>
+          <p>오른쪽 목록에서 오더를 선택하세요</p>
+        </div>
+      </div>
+      
+      <!-- 우측: 텍스트 목록 -->
+      <div class="lg:col-span-2 overflow-y-auto">
         <div class="mb-3 p-3 bg-blue-50 rounded-lg">
           <h3 class="font-bold text-sm flex items-center">
             <i class="fas fa-list mr-2"></i>
@@ -1005,14 +1013,7 @@ ${(order.remarks || []).length > 0 ? `\n📝 비고:\n${(order.remarks || []).ma
         </div>
         ${textList}
       </div>
-      
-      <!-- 우측: 상세 카드 -->
-      <div class="lg:col-span-3 overflow-y-auto" id="orderDetailsPanel">
-        <div class="text-center py-20 text-gray-400">
-          <i class="fas fa-hand-pointer text-6xl mb-4"></i>
-          <p>왼쪽 목록에서 오더를 선택하세요</p>
-        </div>
-      </div>
+    </div>
     </div>
     
     <!-- 숨겨진 카드 데이터 -->
