@@ -3156,7 +3156,7 @@ function updateOrderPreview() {
     }
     
     // 빈 줄로 오더 구분
-    const blocks = text.split(/\\n\\s*\\n/).filter(b => b.trim())
+    const blocks = text.split(/\n\s*\n/).filter(b => b.trim())
     
     if (blocks.length === 0) {
       preview.innerHTML = '<div class="text-gray-500 text-center py-4">오더 정보를 입력해주세요</div>'
@@ -3171,7 +3171,7 @@ function updateOrderPreview() {
     
     blocks.forEach((block, index) => {
       // 오더 타입 자동 감지
-      const firstLine = block.trim().split('\\n')[0].trim()
+      const firstLine = block.trim().split('\n')[0].trim()
       let orderType = 'container_export'
       
       if (firstLine === '수출') orderType = 'container_export'
