@@ -2739,9 +2739,15 @@ function viewOrderDetail(id) {
     <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-2xl font-bold">오더 상세</h3>
-        <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
-          <i class="fas fa-times text-2xl"></i>
-        </button>
+        <div class="flex items-center space-x-2">
+          <button onclick="editOrder(${order.id})" 
+                  class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+            <i class="fas fa-edit mr-2"></i>수정
+          </button>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800 px-3 py-2">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
       </div>
       
       <div class="grid grid-cols-2 gap-4 mb-6">
