@@ -911,73 +911,199 @@ function renderOrderList() {
       : `<div class="text-sm font-medium">${order.work_site || '-'}</div>`
     
     return `
-      <div class="bg-white rounded-lg border ${cardBorderClass} p-4 hover:shadow-lg transition-shadow cursor-pointer ${statusClass}" 
-           onclick="viewOrderDetail(${order.id})">
-        <!-- 상단: 타입 + 경고 + 작업일시 -->
-        <div class="flex items-center justify-between mb-3 pb-2 border-b">
+      <div class="bg-white rounded-lg border ${cardBorderClass} p-6 shadow-sm" data-order-id="${order.id}">
+        <!-- 헤더 -->
+        <div class="flex items-center justify-between mb-4 pb-3 border-b">
           <div class="flex items-center gap-2">
             <span class="px-3 py-1 rounded-full text-xs font-bold ${typeColor}">${typeLabel}</span>
             ${needsAssignment ? '<i class="fas fa-exclamation-triangle text-red-600 text-lg" title="배차/차량 미배정"></i>' : ''}
             ${order.weighing_required ? '<i class="fas fa-balance-scale text-yellow-600" title="계근"></i>' : ''}
-            ${order.status === 'completed' ? '<i class="fas fa-check-circle text-green-600"></i>' : ''}
+            <span class="text-sm text-gray-500">#${order.id}</span>
           </div>
-          <div class="text-sm font-semibold text-gray-700">
-            <i class="far fa-clock mr-1"></i>${formatDate(order.work_datetime)}
-          </div>
+          <button onclick="editOrder(${order.id})" 
+                  class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+            <i class="fas fa-edit mr-1"></i>수정
+          </button>
         </div>
         
-        <!-- 중단: 주요 정보 그리드 -->
-        <div class="grid grid-cols-2 gap-3 mb-3">
-          <!-- 왼쪽 -->
-          <div class="space-y-2">
+        <!-- 주요 정보 -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <div class="text-xs text-gray-500 mb-1">청구처</div>
+            <div class="font-bold text-gray-900">${order.billing_company}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 mb-1">화주</div>
+            <div class="font-semibold text-gray-700">${order.shipper}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 mb-1">작업일시</div>
+            <div class="font-semibold text-gray-700"><i class="far fa-clock mr-1"></i>${formatDate(order.work_datetime)}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 mb-1">BKG/BL/NO</div>
+            <div class="font-mono text-sm font-semibold text-blue-600">${order.booking_number || order.bl_number || order.order_no || '-'}</div>
+          </div>
+          ${order.container_size ? `
+          <div>
+            <div class="text-xs text-gray-500 mb-1">컨테이너 사이즈</div>
+            <div class="font-semibold">${order.container_size}</div>
+          </div>
+          ` : ''}
+          ${order.shipping_line ? `
+          <div>
+            <div class="text-xs text-gray-500 mb-1">선사</div>
+            <div class="font-semibold">${order.shipping_line}</div>
+          </div>
+          ` : ''}
+          ${order.vessel_name ? `
+          <div>
+            <div class="text-xs text-gray-500 mb-1">모선</div>
+            <div class="font-semibold">${order.vessel_name}</div>
+          </div>
+          ` : ''}
+          ${order.contact_person || order.contact_phone ? `
+          <div>
+            <div class="text-xs text-gray-500 mb-1">담당자/연락처</div>
+            <div class="text-sm">${order.contact_person || '-'} / ${order.contact_phone || '-'}</div>
+          </div>
+          ` : ''}
+        </div>
+        
+        <!-- 작업지/상하차지 -->
+        ${order.order_type === 'lcl' ? `
+        <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <div class="text-xs text-gray-500">청구처</div>
-              <div class="font-bold text-gray-900">${order.billing_company}</div>
+              <div class="text-xs text-gray-500 mb-1">상차지</div>
+              <div class="text-sm font-semibold text-blue-600">${order.loading_location || '미정'}</div>
             </div>
             <div>
-              <div class="text-xs text-gray-500">화주</div>
-              <div class="font-semibold text-gray-700">${order.shipper}</div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500">${order.order_type === 'lcl' ? '상하차지' : '작업지'}</div>
-              ${workSiteDisplay}
+              <div class="text-xs text-gray-500 mb-1">하차지</div>
+              <div class="text-sm font-semibold text-green-600">${order.unloading_location || '미정'}</div>
             </div>
           </div>
-          
-          <!-- 오른쪽 -->
-          <div class="space-y-2">
+        </div>
+        ` : order.work_site ? `
+        <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div class="text-xs text-gray-500 mb-1">작업지</div>
+          <div class="text-sm font-medium">${order.work_site}</div>
+        </div>
+        ` : ''}
+        
+        <!-- 배차 정보 -->
+        <div class="mb-4 p-3 ${needsAssignment ? 'bg-red-50 border border-red-200' : 'bg-gray-50'} rounded-lg">
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <div class="text-xs text-gray-500">BKG/BL/NO</div>
-              <div class="font-mono text-sm font-semibold text-blue-600">${order.booking_number || order.bl_number || order.order_no || '-'}</div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500">배차업체</div>
+              <div class="text-xs text-gray-500 mb-1">배차업체</div>
               <div class="font-semibold ${!hasDispatch ? 'text-red-600' : 'text-gray-800'}">
                 ${order.dispatch_company || '⚠️ 미지정'}
-                ${!hasVehicle ? '<span class="text-xs text-red-600 ml-1">(차량 미배정)</span>' : ''}
               </div>
             </div>
             <div>
-              <div class="text-xs text-gray-500">차량정보</div>
-              <div class="text-sm ${!hasVehicle ? 'text-red-600' : 'text-gray-700'}">${order.vehicle_info || '미배정'}</div>
+              <div class="text-xs text-gray-500 mb-1">차량정보</div>
+              <div class="font-semibold ${!hasVehicle ? 'text-red-600' : 'text-gray-700'}">
+                ${order.vehicle_info || '미배정'}
+              </div>
             </div>
           </div>
         </div>
         
-        <!-- 하단: 금액 정보 -->
-        <div class="grid grid-cols-3 gap-2 pt-3 border-t">
-          <div class="text-center">
-            <div class="text-xs text-gray-500">청구</div>
+        <!-- 금액 정보 -->
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div class="p-3 bg-blue-50 rounded-lg text-center">
+            <div class="text-xs text-gray-500 mb-1">청구</div>
             <div class="font-bold text-blue-600">${totalBilling.toLocaleString()}원</div>
+            ${(order.billings || []).length > 0 ? `
+            <div class="text-xs text-gray-500 mt-1">${(order.billings || []).length}건</div>
+            ` : ''}
           </div>
-          <div class="text-center">
-            <div class="text-xs text-gray-500">하불</div>
+          <div class="p-3 bg-orange-50 rounded-lg text-center">
+            <div class="text-xs text-gray-500 mb-1">하불</div>
             <div class="font-bold text-orange-600">${totalPayment.toLocaleString()}원</div>
+            ${(order.payments || []).length > 0 ? `
+            <div class="text-xs text-gray-500 mt-1">${(order.payments || []).length}건</div>
+            ` : ''}
           </div>
-          <div class="text-center">
-            <div class="text-xs text-gray-500">수익</div>
+          <div class="p-3 ${profit >= 0 ? 'bg-green-50' : 'bg-red-50'} rounded-lg text-center">
+            <div class="text-xs text-gray-500 mb-1">수익</div>
             <div class="font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}">${profit.toLocaleString()}원</div>
           </div>
+        </div>
+        
+        <!-- 청구/하불 상세 -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <div class="text-sm font-bold">청구 내역</div>
+              <button onclick="showAddBillingModal(${order.id})" class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+            <div class="space-y-1 max-h-32 overflow-y-auto">
+              ${(order.billings || []).map(b => `
+                <div class="flex justify-between items-center text-xs bg-gray-50 px-2 py-1 rounded">
+                  <span>${b.amount.toLocaleString()}원 ${b.description ? '- ' + b.description : ''}</span>
+                  <button onclick="deleteBilling(${b.id})" class="text-red-600 hover:text-red-800">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              `).join('') || '<div class="text-xs text-gray-400">없음</div>'}
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <div class="text-sm font-bold">하불 내역</div>
+              <button onclick="showAddPaymentModal(${order.id})" class="text-xs px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700">
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+            <div class="space-y-1 max-h-32 overflow-y-auto">
+              ${(order.payments || []).map(p => `
+                <div class="flex justify-between items-center text-xs bg-gray-50 px-2 py-1 rounded">
+                  <span>${p.amount.toLocaleString()}원 ${p.description ? '- ' + p.description : ''}</span>
+                  <button onclick="deletePayment(${p.id})" class="text-red-600 hover:text-red-800">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              `).join('') || '<div class="text-xs text-gray-400">없음</div>'}
+            </div>
+          </div>
+        </div>
+        
+        <!-- 비고 -->
+        ${(order.remarks || []).length > 0 ? `
+        <div class="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+          <div class="text-sm font-bold mb-2">비고</div>
+          <ul class="space-y-1 text-xs">
+            ${(order.remarks || []).map(r => `
+              <li class="flex items-start">
+                <span class="mr-2">${'⭐'.repeat(r.importance)}</span>
+                <span>${r.content}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+        ` : ''}
+        
+        <!-- 액션 버튼들 -->
+        <div class="flex flex-wrap gap-2">
+          <button onclick="copyToClipboard(generateAssignmentCopy(state.orders[${index}]))" 
+                  class="flex-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+            <i class="fas fa-copy mr-1"></i>배정 복사
+          </button>
+          <button onclick="copyToClipboard(generateDispatchCopy(state.orders[${index}]))" 
+                  class="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+            <i class="fas fa-copy mr-1"></i>배차 복사
+          </button>
+          <button onclick="addTodoForOrder(${order.id})" 
+                  class="flex-1 px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm">
+            <i class="fas fa-tasks mr-1"></i>할일
+          </button>
+          <button onclick="if(confirm('삭제하시겠습니까?')) deleteOrder(${order.id})" 
+                  class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm">
+            <i class="fas fa-trash mr-1"></i>삭제
+          </button>
         </div>
       </div>
     `
