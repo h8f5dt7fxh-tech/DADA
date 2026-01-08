@@ -41,8 +41,31 @@ function parseOrderText(text, orderType) {
   let detectedContainerSize = null
   
   for (const line of lines) {
+    // BKG 파싱 (여러 형식 지원)
+    if (line.startsWith('BKG') || line.startsWith('BKG /') || line.startsWith('BKG  :')) {
+      const match = line.match(/BKG\s*[:/]\s*([A-Z0-9]+)(?:\s*\/\s*(.+))?/i)
+      if (match) {
+        order.booking_number = match[1]?.trim()
+        if (match[2]) {
+          order.container_size = match[2]?.replace(/\*\d+/g, '').trim() // *1 제거
+          detectedContainerSize = order.container_size
+        }
+      }
+    }
+    // CON 파싱
+    else if (line.startsWith('CON') || line.startsWith('CON :')) {
+      const match = line.match(/CON\s*:\s*([A-Z0-9]+)(?:\s*\/\s*T\.W\s*(.+))?/i)
+      if (match) {
+        order.container_number = match[1]?.trim()
+        if (match[2]) order.tw = match[2]?.trim()
+      }
+    }
+    // SEAL 파싱
+    else if (line.startsWith('SEAL') || line.startsWith('SEAL :')) {
+      order.seal_number = line.split(':')[1]?.trim()
+    }
     // 컨테이너 수출
-    if (line.startsWith('BKG/SIZE') || line.startsWith('BKG / SIZE')) {
+    else if (line.startsWith('BKG/SIZE') || line.startsWith('BKG / SIZE')) {
       const match = line.match(/:\s*(.+?)(?:\s*\/\s*(.+))?$/)
       if (match) {
         order.booking_number = match[1]?.trim()
@@ -79,12 +102,19 @@ function parseOrderText(text, orderType) {
         order.contact_phone = match[2]?.trim()
       }
     }
-    else if (line.startsWith('작업일시') || line.startsWith('작업일시 :')) {
+    else if (line.startsWith('작업일시') || line.startsWith('작업일시 :') || line.startsWith('진행일시') || line.startsWith('진행일시 :')) {
       const dateStr = line.split(':')[1]?.trim()
-      // "2025.12.02(화) 08:30" 형식 파싱
-      const match = dateStr?.match(/(\d{4})\.(\d{2})\.(\d{2}).*?(\d{2}):(\d{2})/)
-      if (match) {
-        order.work_datetime = `${match[1]}-${match[2]}-${match[3]} ${match[4]}:${match[5]}`
+      // "2026.01.08 09:00" 또는 "2026.01.08" 형식 파싱
+      if (dateStr) {
+        const match = dateStr.match(/(\d{4})\.(\d{1,2})\.(\d{1,2})(?:.*?(\d{2}):(\d{2}))?/)
+        if (match) {
+          const year = match[1]
+          const month = match[2].padStart(2, '0')
+          const day = match[3].padStart(2, '0')
+          const hour = match[4] || '00'
+          const minute = match[5] || '00'
+          order.work_datetime = `${year}-${month}-${day} ${hour}:${minute}`
+        }
       }
     }
     else if (line.startsWith('선사') || line.startsWith('선사 :')) {
