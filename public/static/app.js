@@ -74,8 +74,8 @@ function parseOrderText(text, orderType) {
       }
     }
     // 컨테이너 수입
-    else if (line.startsWith('BL :') || line.startsWith('BL:')) {
-      order.bl_number = line.split(':')[1]?.trim()
+    else if (line.startsWith('BL :') || line.startsWith('BL:') || line.startsWith('BL ')) {
+      order.bl_number = line.split(':')[1]?.trim() || line.replace('BL', '').trim()
     }
     else if (line.startsWith('CON/SIZE') || line.startsWith('CON / SIZE')) {
       const match = line.match(/:\s*(.+?)(?:\s*\/\s*(.+))?$/)
@@ -83,6 +83,16 @@ function parseOrderText(text, orderType) {
         order.container_number = match[1]?.trim()
         order.container_size = match[2]?.trim()
         detectedContainerSize = order.container_size
+      }
+    }
+    else if (line.startsWith('컨테이너 넘버') || line.startsWith('컨테이너 넘버 /')) {
+      const match = line.match(/:\s*(.+?)(?:\s*\/\s*SIZE\s*:\s*(.+))?$/i)
+      if (match) {
+        order.container_number = match[1]?.trim()
+        if (match[2]) {
+          order.container_size = match[2]?.trim()
+          detectedContainerSize = order.container_size
+        }
       }
     }
     // 공통
@@ -104,15 +114,30 @@ function parseOrderText(text, orderType) {
     }
     else if (line.startsWith('작업일시') || line.startsWith('작업일시 :') || line.startsWith('진행일시') || line.startsWith('진행일시 :')) {
       const dateStr = line.split(':')[1]?.trim()
-      // "2026.01.08 09:00" 또는 "2026.01.08" 형식 파싱
+      // "2026.01.08 09:00", "2026.010.08", "2206.01.08" 형식 파싱
       if (dateStr) {
-        const match = dateStr.match(/(\d{4})\.(\d{1,2})\.(\d{1,2})(?:.*?(\d{2}):(\d{2}))?/)
+        // 날짜에서 숫자 추출 (점으로 구분된 연월일과 시간)
+        const match = dateStr.match(/(\d{4})\.(\d{1,3})\.(\d{1,2})(?:.*?(\d{1,2}):(\d{2}))?/)
         if (match) {
-          const year = match[1]
-          const month = match[2].padStart(2, '0')
-          const day = match[3].padStart(2, '0')
-          const hour = match[4] || '00'
+          let year = match[1]
+          let month = match[2]
+          let day = match[3]
+          
+          // 연도 오타 수정 (2206 → 2026)
+          if (year.startsWith('22') && parseInt(year) > 2200) {
+            year = '20' + year.substring(2)
+          }
+          
+          // 월 오타 수정 (010 → 01)
+          if (month.length > 2) {
+            month = month.replace(/^0+/, '')
+          }
+          
+          month = month.padStart(2, '0')
+          day = day.padStart(2, '0')
+          const hour = (match[4] || '00').padStart(2, '0')
           const minute = match[5] || '00'
+          
           order.work_datetime = `${year}-${month}-${day} ${hour}:${minute}`
         }
       }
@@ -140,8 +165,39 @@ function parseOrderText(text, orderType) {
       const match = line.match(/:\s*(.+?)(?:\s*\/\s*(.+))?$/)
       if (match) {
         order.loading_location = match[1]?.trim()
-        order.unloading_location = match[2]?.trim()
+        if (match[2]) order.unloading_location = match[2]?.trim()
       }
+    }
+    else if (line.startsWith('하차지') && !line.startsWith('상차지')) {
+      // 하차지만 별도로 있는 경우
+      order.unloading_location = line.split(':')[1]?.trim()
+    }
+    else if (line.startsWith('상차일') || line.startsWith('상차일 :')) {
+      // LCL 상차일
+      const dateStr = line.split(':')[1]?.trim()
+      if (dateStr && !order.work_datetime) {
+        const match = dateStr.match(/(\d{4})\.(\d{1,3})\.(\d{1,2})/)
+        if (match) {
+          let year = match[1]
+          let month = match[2].length > 2 ? match[2].replace(/^0+/, '') : match[2]
+          let day = match[3]
+          order.work_datetime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} 00:00`
+        }
+      }
+    }
+    else if (line.startsWith('하차일') || line.startsWith('하차일 :')) {
+      // LCL 하차일 (비고로 저장)
+      const dateInfo = line.split(':')[1]?.trim()
+      if (dateInfo) {
+        order.remarks.push({
+          content: `하차일: ${dateInfo}`,
+          importance: 1
+        })
+      }
+    }
+    else if (line.startsWith('차량정보') || line.startsWith('차량정보 :')) {
+      // LCL 차량정보
+      order.vehicle_info = line.split(':')[1]?.trim()
     }
     else if (line.startsWith('중량') || line.startsWith('중량 :')) {
       order.weight = line.split(':')[1]?.trim()
