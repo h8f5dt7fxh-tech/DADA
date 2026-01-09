@@ -613,7 +613,7 @@ async function deleteTodo(id) {
 // ============================================
 
 let searchTimeout = null
-async function quickSearchShipper(event) {
+window.quickSearchShipper = async function(event) {
   const query = event.target.value.trim()
   const resultsDiv = document.getElementById('quickSearchResults')
   
@@ -682,7 +682,7 @@ document.addEventListener('click', (e) => {
 })
 
 // 화주 정보 빠른 보기
-async function showShipperQuick(billingCompanyId, shipperId, shipperName, billingCompany) {
+window.showShipperQuick = async function(billingCompanyId, shipperId, shipperName, billingCompany) {
   // 검색창 닫기
   document.getElementById('quickSearchResults').classList.add('hidden')
   document.getElementById('quickShipperSearch').value = ''
