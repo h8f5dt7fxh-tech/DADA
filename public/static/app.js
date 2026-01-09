@@ -3193,11 +3193,35 @@ async function quickParseOrders() {
     return
   }
   
-  // 빈 줄로 오더 구분
-  const blocks = text.split(/\n\s*\n/).filter(b => b.trim())
+  // "수출", "수입", "LCL", "벌크"를 기준으로 오더 구분
+  const lines = text.split('\n')
+  const blocks = []
+  let currentBlock = []
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+    
+    // 오더 타입 키워드로 시작하면 새 블록 시작
+    if (trimmedLine === '수출' || trimmedLine === '수입' || trimmedLine === 'LCL' || trimmedLine === '벌크') {
+      // 이전 블록이 있으면 저장
+      if (currentBlock.length > 0) {
+        blocks.push(currentBlock.join('\n'))
+      }
+      // 새 블록 시작
+      currentBlock = [line]
+    } else if (trimmedLine) {
+      // 내용이 있으면 현재 블록에 추가
+      currentBlock.push(line)
+    }
+  }
+  
+  // 마지막 블록 추가
+  if (currentBlock.length > 0) {
+    blocks.push(currentBlock.join('\n'))
+  }
   
   if (blocks.length === 0) {
-    alert('오더 정보를 찾을 수 없습니다.')
+    alert('오더 정보를 찾을 수 없습니다.\n\n각 오더는 "수출", "수입", "LCL", "벌크"로 시작해야 합니다.')
     return
   }
   
@@ -3383,11 +3407,35 @@ function updateOrderPreview() {
       return
     }
     
-    // 빈 줄로 오더 구분 (2개 이상의 연속된 줄바꿈)
-    const blocks = text.split(/\n\n+/).filter(b => b.trim())
+    // "수출", "수입", "LCL", "벌크"를 기준으로 오더 구분
+    const lines = text.split('\n')
+    const blocks = []
+    let currentBlock = []
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim()
+      
+      // 오더 타입 키워드로 시작하면 새 블록 시작
+      if (trimmedLine === '수출' || trimmedLine === '수입' || trimmedLine === 'LCL' || trimmedLine === '벌크') {
+        // 이전 블록이 있으면 저장
+        if (currentBlock.length > 0) {
+          blocks.push(currentBlock.join('\n'))
+        }
+        // 새 블록 시작
+        currentBlock = [line]
+      } else if (trimmedLine) {
+        // 내용이 있으면 현재 블록에 추가
+        currentBlock.push(line)
+      }
+    }
+    
+    // 마지막 블록 추가
+    if (currentBlock.length > 0) {
+      blocks.push(currentBlock.join('\n'))
+    }
     
     if (blocks.length === 0) {
-      preview.innerHTML = '<div class="text-gray-500 text-center py-4">오더 정보를 입력해주세요</div>'
+      preview.innerHTML = '<div class="text-gray-500 text-center py-4">오더 정보를 입력해주세요<br><small class="text-xs text-gray-400 mt-2">각 오더는 "수출", "수입", "LCL", "벌크"로 시작</small></div>'
       countSpan.textContent = ''
       createBtn.disabled = true
       window.parsedOrdersCache = []
