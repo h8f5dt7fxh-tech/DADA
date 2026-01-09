@@ -278,6 +278,13 @@ function parseOrderText(text, orderType) {
     }
   }
   
+  // undefined 값을 null로 변환 (D1 데이터베이스 호환성)
+  Object.keys(order).forEach(key => {
+    if (order[key] === undefined) {
+      order[key] = null
+    }
+  })
+  
   return order
 }
 
