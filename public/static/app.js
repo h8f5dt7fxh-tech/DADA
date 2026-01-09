@@ -3510,6 +3510,7 @@ async function bulkCreateOrders() {
   
   let successCount = 0
   let failCount = 0
+  const errors = []
   
   for (let i = 0; i < orders.length; i++) {
     try {
@@ -3524,9 +3525,14 @@ async function bulkCreateOrders() {
         btnText.textContent = `생성 중... (${successCount}/${orders.length})`
       } else {
         failCount++
+        const errorData = await response.json().catch(() => ({ error: '알 수 없는 오류' }))
+        errors.push(`오더 #${i+1}: ${errorData.error || response.statusText}`)
+        console.error(`오더 생성 실패 #${i+1}:`, errorData)
       }
     } catch (error) {
       failCount++
+      errors.push(`오더 #${i+1}: ${error.message}`)
+      console.error(`오더 생성 에러 #${i+1}:`, error)
     }
   }
   
@@ -3534,14 +3540,15 @@ async function bulkCreateOrders() {
   btnText.textContent = originalText
   
   if (failCount === 0) {
-    alert(`✅ ${successCount}건의 오더가 생성되었습니다!`)
+    alert(`✅ ${successCount}건의 오더가 모두 성공적으로 생성되었습니다!`)
     // 입력 초기화
     document.getElementById('orderTextInput').value = ''
     updateOrderPreview()
     // 오더 목록으로 이동
     changePage('orders')
   } else {
-    alert(`⚠️ 생성 완료: ${successCount}건 성공, ${failCount}건 실패`)
+    console.error('오더 생성 실패 상세:', errors)
+    alert(`⚠️ 생성 완료: ${successCount}건 성공, ${failCount}건 실패\n\n실패 상세:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...(더 많은 오류는 콘솔 확인)' : ''}`)
   }
 }
 
