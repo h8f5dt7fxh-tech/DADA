@@ -609,6 +609,194 @@ async function deleteTodo(id) {
 }
 
 // ============================================
+// 화주 빠른 검색
+// ============================================
+
+let searchTimeout = null
+async function quickSearchShipper(event) {
+  const query = event.target.value.trim()
+  const resultsDiv = document.getElementById('quickSearchResults')
+  
+  if (query.length < 2) {
+    resultsDiv.classList.add('hidden')
+    return
+  }
+  
+  // 디바운스
+  if (searchTimeout) clearTimeout(searchTimeout)
+  
+  searchTimeout = setTimeout(async () => {
+    try {
+      // 모든 청구처-화주 조합 검색
+      const response = await axios.get('/api/billing-sales')
+      const billingSales = response.data
+      
+      // 화주명으로 필터링
+      const matches = []
+      for (const sales of billingSales) {
+        const shippersRes = await axios.get(`/api/billing-sales/${sales.id}/shippers`)
+        const shippers = shippersRes.data
+        
+        for (const shipper of shippers) {
+          if (shipper.shipper_name.toLowerCase().includes(query.toLowerCase())) {
+            matches.push({
+              billingCompany: sales.billing_company,
+              billingCompanyId: sales.id,
+              ...shipper
+            })
+          }
+        }
+      }
+      
+      if (matches.length === 0) {
+        resultsDiv.innerHTML = '<div class="p-4 text-gray-500 text-sm">검색 결과가 없습니다</div>'
+        resultsDiv.classList.remove('hidden')
+        return
+      }
+      
+      // 결과 표시
+      const html = matches.map(m => `
+        <div class="p-3 hover:bg-gray-50 cursor-pointer border-b" 
+             onclick="showShipperQuick(${m.billingCompanyId}, ${m.id}, '${m.shipper_name.replace(/'/g, "\\'")}', '${m.billingCompany.replace(/'/g, "\\'")}')">
+          <div class="font-semibold text-sm">${m.shipper_name}</div>
+          <div class="text-xs text-gray-500">${m.billingCompany}</div>
+        </div>
+      `).join('')
+      
+      resultsDiv.innerHTML = html
+      resultsDiv.classList.remove('hidden')
+    } catch (error) {
+      console.error('검색 실패:', error)
+    }
+  }, 300)
+}
+
+// 검색 결과 외부 클릭 시 닫기
+document.addEventListener('click', (e) => {
+  const searchInput = document.getElementById('quickShipperSearch')
+  const resultsDiv = document.getElementById('quickSearchResults')
+  
+  if (searchInput && resultsDiv && !searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+    resultsDiv.classList.add('hidden')
+  }
+})
+
+// 화주 정보 빠른 보기
+async function showShipperQuick(billingCompanyId, shipperId, shipperName, billingCompany) {
+  // 검색창 닫기
+  document.getElementById('quickSearchResults').classList.add('hidden')
+  document.getElementById('quickShipperSearch').value = ''
+  
+  try {
+    const response = await axios.get(`/api/billing-sales/${billingCompanyId}/shippers`)
+    const shipper = response.data.find(s => s.id === shipperId)
+    
+    if (!shipper) {
+      alert('화주 정보를 찾을 수 없습니다.')
+      return
+    }
+    
+    // 모달 생성
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove()
+    }
+    
+    const quotationHtml = shipper.quotation
+      ? shipper.quotation.split('\\n').map(line => {
+          line = line.trim()
+          if (!line) return '<br>'
+          
+          // 헤더 라인 (왕복, 편도 등)
+          if (line.includes('/') && (line.includes('왕복') || line.includes('편도'))) {
+            return `<div class="font-bold text-blue-600">${line}</div>`
+          }
+          // 가격 라인
+          else if (line.includes('원')) {
+            return `<div class="text-green-600 font-semibold ml-4">${line}</div>`
+          }
+          // 일반 텍스트
+          else {
+            return `<div class="text-gray-700 ml-2">${line}</div>`
+          }
+        }).join('')
+      : '<div class="text-gray-400">견적이 없습니다</div>'
+    
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b">
+          <div>
+            <h3 class="text-xl font-bold">${shipperName}</h3>
+            <p class="text-sm text-gray-500"><i class="fas fa-building mr-1"></i>${billingCompany}</p>
+          </div>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <!-- 통합 정보 카드 -->
+        <div class="border rounded-lg overflow-hidden">
+          <!-- 헤더 -->
+          <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 flex items-center justify-between">
+            <h4 class="font-bold text-lg">
+              <i class="fas fa-file-invoice mr-2"></i>견적 및 비고
+            </h4>
+            <button onclick="editShipperQuotation(${billingCompanyId}, ${shipperId}, '${shipperName.replace(/'/g, "\\'")}'); this.closest('.fixed').remove()" 
+                    class="px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded text-sm">
+              <i class="fas fa-edit mr-1"></i>수정
+            </button>
+          </div>
+          
+          <!-- 견적 내용 -->
+          <div class="p-4 bg-gray-50">
+            <div class="mb-3">
+              <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">📋 견적 정보</span>
+            </div>
+            <div class="whitespace-pre-wrap text-sm mb-4 bg-white p-3 rounded border">
+              ${quotationHtml}
+            </div>
+            
+            <!-- 사진 미리보기 -->
+            ${shipper.photo_url ? `
+            <div class="mb-4">
+              <span class="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded mb-2">📷 첨부 사진</span>
+              <div class="bg-white p-3 rounded border">
+                <img src="${shipper.photo_url}" alt="견적 사진" 
+                     class="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity" 
+                     onclick="window.open('${shipper.photo_url}', '_blank')"
+                     title="클릭하여 크게 보기">
+                <p class="text-xs text-gray-500 mt-2 text-center">💡 클릭하여 크게 보기</p>
+              </div>
+            </div>
+            ` : ''}
+            
+            <!-- 비고 -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="inline-block px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded">📝 비고</span>
+                <button onclick="editShipperMemo(${billingCompanyId}, ${shipperId}, '${shipperName.replace(/'/g, "\\'")}', '${(shipper.memo || '').replace(/'/g, "\\'")}'); this.closest('.fixed').remove()" 
+                        class="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-xs">
+                  <i class="fas fa-edit mr-1"></i>비고 수정
+                </button>
+              </div>
+              <div class="p-3 bg-yellow-50 rounded border text-sm whitespace-pre-wrap">
+                ${shipper.memo || '<span class="text-gray-400 italic">비고가 없습니다</span>'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    console.error('화주 정보 로드 실패:', error)
+    alert('화주 정보를 불러오는데 실패했습니다.')
+  }
+}
+
+// ============================================
 // UI 렌더링 함수
 // ============================================
 
@@ -638,6 +826,16 @@ function renderNavigation() {
               <button onclick="changePage('todos')" class="nav-link ${state.currentPage === 'todos' ? 'tab-active' : ''} px-3 py-2">
                 <i class="fas fa-tasks mr-1"></i>할일
               </button>
+            </div>
+            
+            <!-- 화주 빠른 검색 -->
+            <div class="ml-auto relative">
+              <input type="text" 
+                     id="quickShipperSearch"
+                     placeholder="화주 검색..."
+                     class="px-4 py-2 border rounded-lg text-sm w-64 focus:outline-none focus:border-blue-500"
+                     onkeyup="quickSearchShipper(event)">
+              <div id="quickSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-96 overflow-y-auto hidden z-50"></div>
             </div>
           </div>
           
@@ -4150,38 +4348,57 @@ window.viewBillingDetail = async function(id) {
                   </div>
                 </div>
                 
-                <!-- 견적 영역 -->
+                <!-- 통합 견적/비고 영역 -->
                 <div class="border-t pt-3 mt-3">
-                  <div class="flex justify-between items-center mb-2">
+                  <div class="flex justify-between items-center mb-3">
                     <span class="font-semibold text-gray-700">
-                      <i class="fas fa-file-invoice-dollar mr-1 text-indigo-600"></i>견적
+                      <i class="fas fa-file-invoice-dollar mr-1 text-indigo-600"></i>견적 및 비고
                     </span>
                     <button onclick="window.editShipperQuotation(${shipper.id}, ${id})" 
                             class="px-3 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600">
-                      <i class="fas fa-edit mr-1"></i>${shipper.quotation ? '수정' : '작성'}
+                      <i class="fas fa-edit mr-1"></i>수정
                     </button>
                   </div>
-                  ${shipper.quotation ? `
-                    <div class="bg-gray-50 rounded p-3 text-sm" style="white-space: pre-wrap;">${shipper.quotation.split('\\n').map(line => {
-                      line = line.trim()
-                      if (!line) return '<br>'
-                      if (/\\d+[,\\d]*\\s*원/.test(line)) {
-                        return '<div class="text-green-600 font-semibold ml-4">' + line + '</div>'
-                      } else if (/왕복|편도|수입|수출/.test(line)) {
-                        return '<div class="text-blue-600 font-bold mt-2 mb-1">' + line + '</div>'
-                      } else {
-                        return '<div class="text-gray-700">' + line + '</div>'
-                      }
-                    }).join('')}</div>
-                  ` : '<p class="text-gray-400 text-sm">견적 없음</p>'}
                   
+                  <!-- 견적 정보 -->
+                  <div class="mb-3">
+                    <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded mb-2">📋 견적</span>
+                    ${shipper.quotation ? `
+                      <div class="bg-gray-50 rounded p-3 text-sm border" style="white-space: pre-wrap;">${shipper.quotation.split('\\n').map(line => {
+                        line = line.trim()
+                        if (!line) return '<br>'
+                        if (/\\d+[,\\d]*\\s*원/.test(line)) {
+                          return '<div class="text-green-600 font-semibold ml-4">' + line + '</div>'
+                        } else if (/왕복|편도|수입|수출/.test(line)) {
+                          return '<div class="text-blue-600 font-bold mt-2 mb-1">' + line + '</div>'
+                        } else {
+                          return '<div class="text-gray-700">' + line + '</div>'
+                        }
+                      }).join('')}</div>
+                    ` : '<p class="text-gray-400 text-sm italic pl-3">견적 없음</p>'}
+                  </div>
+                  
+                  <!-- 첨부 사진 -->
                   ${shipper.photo_url ? `
-                    <div class="mt-3">
-                      <img src="${shipper.photo_url}" alt="견적 사진" 
-                           class="w-full max-w-md rounded cursor-pointer hover:opacity-90"
-                           onclick="window.viewPhotoModal('${shipper.photo_url}')">
+                    <div class="mb-3">
+                      <span class="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded mb-2">📷 첨부 사진</span>
+                      <div class="bg-white p-2 rounded border">
+                        <img src="${shipper.photo_url}" alt="견적 사진" 
+                             class="w-full max-w-md rounded cursor-pointer hover:opacity-90"
+                             onclick="window.viewPhotoModal('${shipper.photo_url}')"
+                             title="클릭하여 크게 보기">
+                        <p class="text-xs text-gray-500 mt-1 text-center">💡 클릭하여 크게 보기</p>
+                      </div>
                     </div>
                   ` : ''}
+                  
+                  <!-- 비고 -->
+                  <div>
+                    <span class="inline-block px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded mb-2">📝 비고</span>
+                    <div class="bg-yellow-50 rounded p-3 text-sm border" style="white-space: pre-wrap;">
+                      ${shipper.memo || '<span class="text-gray-400 italic">비고 없음</span>'}
+                    </div>
+                  </div>
                 </div>
               </div>
             `).join('')
