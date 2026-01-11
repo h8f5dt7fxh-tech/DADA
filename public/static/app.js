@@ -1242,6 +1242,9 @@ function renderOrderList() {
 
 BKG/BL: ${order.booking_number || order.bl_number || order.order_no || '-'}
 ${order.container_size ? `컨테이너: ${order.container_size}` : ''}
+${order.container_number ? `컨테이너 번호: ${order.container_number}` : ''}
+${order.seal_number ? `씰 번호: ${order.seal_number}` : ''}
+${order.tw ? `T.W: ${order.tw}` : ''}
 ${order.shipping_line ? `선사: ${order.shipping_line}` : ''}
 ${order.vessel_name ? `모선: ${order.vessel_name}` : ''}
 
