@@ -250,6 +250,30 @@ app.post('/api/orders', async (c) => {
       remarks, billings, payments
     } = body
     
+    // ✅ 필수 필드 검증 (최소한으로 유지)
+    if (!order_type) {
+      return c.json({ error: '오더 타입(order_type)은 필수입니다' }, 400)
+    }
+    if (!billing_company) {
+      return c.json({ error: '청구처(billing_company)는 필수입니다' }, 400)
+    }
+    if (!shipper) {
+      return c.json({ error: '화주(shipper)는 필수입니다' }, 400)
+    }
+    
+    // ✅ work_datetime 자동 생성: 없으면 현재 시간으로 설정
+    let finalWorkDatetime = work_datetime
+    if (!finalWorkDatetime || finalWorkDatetime === 'undefined' || finalWorkDatetime === 'null') {
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const day = String(now.getDate()).padStart(2, '0')
+      const hour = String(now.getHours()).padStart(2, '0')
+      const minute = String(now.getMinutes()).padStart(2, '0')
+      finalWorkDatetime = `${year}-${month}-${day} ${hour}:${minute}`
+      console.warn(`⚠️ work_datetime이 없어서 자동 생성: ${finalWorkDatetime}`)
+    }
+    
     // 오더 삽입
     const result = await env.DB.prepare(`
       INSERT INTO transport_orders (
@@ -264,8 +288,8 @@ app.post('/api/orders', async (c) => {
         dispatch_company, vehicle_info, status, weighing_required
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      order_type, billing_company, shipper, work_site, work_site_code || null,
-      contact_person || null, contact_phone || null, work_datetime,
+      order_type, billing_company, shipper, work_site || null, work_site_code || null,
+      contact_person || null, contact_phone || null, finalWorkDatetime,
       booking_number || null, container_size || null, shipping_line || null, vessel_name || null,
       export_country || null, berth_date || null, departure_date || null, weight || null,
       container_number || null, tw || null, seal_number || null,
