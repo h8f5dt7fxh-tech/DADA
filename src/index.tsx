@@ -329,7 +329,7 @@ app.post('/api/orders', async (c) => {
       }
     }
     
-    return c.json({ id: orderId, message: '오더가 생성되었습니다' })
+    return c.json({ orderId: orderId, message: '오더가 생성되었습니다' })
   } catch (error: any) {
     console.error('Create Order Error:', error)
     return c.json({ 
