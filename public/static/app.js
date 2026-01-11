@@ -176,31 +176,38 @@ function parseOrderText(text, orderType) {
       // LCL 상차일
       const dateStr = line.split(':')[1]?.trim()
       if (dateStr && !order.work_datetime) {
-        // 날짜 파싱: 2026.01.08 또는 2026.01.08 오후 상차
-        const match = dateStr.match(/(\d{4})\.(\d{1,3})\.(\d{1,2})/)
+        // 날짜 파싱: 2026.01.08 또는 2026.01.08 오후 상차 또는 2026-01.08 오후 상차
+        const match = dateStr.match(/(\d{4})[\.\-](\d{1,3})[\.\-](\d{1,2})/)
         if (match) {
           let year = match[1]
           let month = match[2].length > 2 ? match[2].replace(/^0+/, '') : match[2]
           let day = match[3]
           
           // 시간 정보 추출 (오전/오후/시간)
-          let hour = '00'
+          let hour = '09' // 기본값: 오전 9시
           let minute = '00'
           
-          if (dateStr.includes('오후')) {
-            hour = '14' // 오후는 14시로 가정
-          } else if (dateStr.includes('오전')) {
-            hour = '09' // 오전은 09시로 가정
-          }
-          
-          // HH:mm 형식이 있으면 추출
+          // 1) HH:mm 형식이 있으면 우선 추출
           const timeMatch = dateStr.match(/(\d{1,2}):(\d{2})/)
           if (timeMatch) {
             hour = timeMatch[1].padStart(2, '0')
             minute = timeMatch[2]
+          } 
+          // 2) 오전/오후 키워드로 판단
+          else if (dateStr.includes('오후')) {
+            hour = '14' // 오후는 14시로 가정
+          } else if (dateStr.includes('오전')) {
+            hour = '09' // 오전은 09시로 가정
+          }
+          // 3) "시간 추후 공유", "시간 추후", "추후" 등이 있으면 기본 09:00
+          else if (dateStr.includes('추후') || dateStr.includes('미정')) {
+            hour = '09'
           }
           
           order.work_datetime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${hour}:${minute}`
+        } else {
+          // 날짜 형식이 없으면 오늘 날짜 + 09:00으로 기본 설정
+          console.warn(`⚠️  상차일 파싱 실패: ${dateStr}`)
         }
       }
     }
