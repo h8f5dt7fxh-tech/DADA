@@ -113,11 +113,14 @@ function parseOrderText(text, orderType) {
       }
     }
     else if (line.startsWith('작업일시') || line.startsWith('작업일시 :') || line.startsWith('진행일시') || line.startsWith('진행일시 :')) {
-      const dateStr = line.split(':')[1]?.trim()
-      // "2026.01.08 09:00", "2026.01.08 13:00", "2026.010.08", "2206.01.08" 형식 파싱
+      // ✅ CRITICAL FIX: 콜론이 여러 개 있을 수 있으므로 첫 콜론 이후 전체를 가져옴
+      const colonIndex = line.indexOf(':')
+      const dateStr = colonIndex >= 0 ? line.substring(colonIndex + 1).trim() : ''
+      
+      // "2026.01.08 09:00", "2026.01.19 13:00", "2026.010.08", "2206.01.08" 형식 파싱
       if (dateStr) {
-        // 날짜에서 숫자 추출 (점으로 구분된 연월일과 시간)
-        const match = dateStr.match(/(\d{4})\.(\d{1,3})\.(\d{1,2})(?:.*?(\d{1,2}):(\d{2}))?/)
+        // 날짜와 시간을 모두 추출
+        const match = dateStr.match(/(\d{4})\.(\d{1,3})\.(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/)
         if (match) {
           let year = match[1]
           let month = match[2]
@@ -136,7 +139,7 @@ function parseOrderText(text, orderType) {
           month = month.padStart(2, '0')
           day = day.padStart(2, '0')
           
-          // ✅ 시간 파싱 개선: HH:mm 형식을 우선 추출
+          // ✅ 시간 파싱: HH:mm 형식을 우선 추출
           let hour = '09'  // 기본값: 오전 9시
           let minute = '00'
           
