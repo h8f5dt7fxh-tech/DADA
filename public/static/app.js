@@ -114,7 +114,7 @@ function parseOrderText(text, orderType) {
     }
     else if (line.startsWith('작업일시') || line.startsWith('작업일시 :') || line.startsWith('진행일시') || line.startsWith('진행일시 :')) {
       const dateStr = line.split(':')[1]?.trim()
-      // "2026.01.08 09:00", "2026.010.08", "2206.01.08" 형식 파싱
+      // "2026.01.08 09:00", "2026.01.08 13:00", "2026.010.08", "2206.01.08" 형식 파싱
       if (dateStr) {
         // 날짜에서 숫자 추출 (점으로 구분된 연월일과 시간)
         const match = dateStr.match(/(\d{4})\.(\d{1,3})\.(\d{1,2})(?:.*?(\d{1,2}):(\d{2}))?/)
@@ -135,8 +135,24 @@ function parseOrderText(text, orderType) {
           
           month = month.padStart(2, '0')
           day = day.padStart(2, '0')
-          const hour = (match[4] || '00').padStart(2, '0')
-          const minute = match[5] || '00'
+          
+          // ✅ 시간 파싱 개선: HH:mm 형식을 우선 추출
+          let hour = '09'  // 기본값: 오전 9시
+          let minute = '00'
+          
+          if (match[4] && match[5]) {
+            // HH:mm 형식이 명시되어 있으면 사용
+            hour = match[4].padStart(2, '0')
+            minute = match[5]
+          } else {
+            // 시간이 없으면 오전/오후 키워드 확인
+            if (dateStr.includes('오후')) {
+              hour = '14'
+            } else if (dateStr.includes('오전')) {
+              hour = '09'
+            }
+            // 기타: 기본값 09:00 사용
+          }
           
           order.work_datetime = `${year}-${month}-${day} ${hour}:${minute}`
         }
