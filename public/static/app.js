@@ -176,12 +176,31 @@ function parseOrderText(text, orderType) {
       // LCL 상차일
       const dateStr = line.split(':')[1]?.trim()
       if (dateStr && !order.work_datetime) {
+        // 날짜 파싱: 2026.01.08 또는 2026.01.08 오후 상차
         const match = dateStr.match(/(\d{4})\.(\d{1,3})\.(\d{1,2})/)
         if (match) {
           let year = match[1]
           let month = match[2].length > 2 ? match[2].replace(/^0+/, '') : match[2]
           let day = match[3]
-          order.work_datetime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} 00:00`
+          
+          // 시간 정보 추출 (오전/오후/시간)
+          let hour = '00'
+          let minute = '00'
+          
+          if (dateStr.includes('오후')) {
+            hour = '14' // 오후는 14시로 가정
+          } else if (dateStr.includes('오전')) {
+            hour = '09' // 오전은 09시로 가정
+          }
+          
+          // HH:mm 형식이 있으면 추출
+          const timeMatch = dateStr.match(/(\d{1,2}):(\d{2})/)
+          if (timeMatch) {
+            hour = timeMatch[1].padStart(2, '0')
+            minute = timeMatch[2]
+          }
+          
+          order.work_datetime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${hour}:${minute}`
         }
       }
     }
