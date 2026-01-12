@@ -2899,14 +2899,18 @@ function changePage(page) {
   }
   render()
   
-  if (page === 'orders') {
+  // 페이지별 데이터 로드 (탭이 이미 로드되어 있으면 다시 로드하지 않음)
+  if (page === 'orders' && state.orders.length === 0) {
     fetchOrders()
   } else if (page === 'todos') {
-    fetchTodos()
+    fetchTodos()  // TODO는 항상 최신 데이터 로드
   } else if (page === 'create-order') {
     renderInputContent()
   } else if (page === 'clients') {
-    fetchBillingSales()
+    const clientsContainer = document.getElementById('clientsContainer')
+    if (!clientsContainer || clientsContainer.innerHTML.trim() === '') {
+      fetchBillingSales()
+    }
   }
 }
 
@@ -4015,45 +4019,64 @@ function downloadExcel() {
 function render() {
   const app = document.getElementById('app')
   
-  let content = ''
+  // 첫 렌더링인지 확인
+  const isFirstRender = !document.getElementById('tab-orders')
   
-  if (state.currentPage === 'orders') {
-    content = `
-      ${renderOrderFilters()}
-      <div id="orderListContainer"></div>
-    `
-  } else if (state.currentPage === 'create-order') {
-    content = renderCreateOrderPage()
-    setTimeout(() => renderInputContent(), 0)  // 렌더링 후 내용 채우기
-  } else if (state.currentPage === 'todos') {
-    content = `<div id="todoContainer"></div>`
-  } else if (state.currentPage === 'codes') {
-    content = renderCodesManagementPage()
-  } else if (state.currentPage === 'clients') {
-    content = renderClientsManagementPage()
-  } else {
-    content = `
-      <div class="bg-white p-6 rounded-lg shadow">
-        <h2 class="text-2xl font-bold mb-4">${state.currentPage}</h2>
-        <p class="text-gray-600">이 페이지는 곧 구현됩니다.</p>
+  if (isFirstRender) {
+    // 첫 렌더링: 모든 탭 생성
+    app.innerHTML = `
+      ${renderNavigation()}
+      <div class="max-w-7xl mx-auto px-4 py-6">
+        <div id="tab-orders" class="tab-content" style="display: none;">
+          ${renderOrderFilters()}
+          <div id="orderListContainer"></div>
+        </div>
+        <div id="tab-create-order" class="tab-content" style="display: none;">
+          ${renderCreateOrderPage()}
+        </div>
+        <div id="tab-todos" class="tab-content" style="display: none;">
+          <div id="todoContainer"></div>
+        </div>
+        <div id="tab-codes" class="tab-content" style="display: none;">
+          ${renderCodesManagementPage()}
+        </div>
+        <div id="tab-clients" class="tab-content" style="display: none;">
+          ${renderClientsManagementPage()}
+        </div>
       </div>
     `
   }
   
-  app.innerHTML = `
-    ${renderNavigation()}
-    <div class="max-w-7xl mx-auto px-4 py-6">
-      ${content}
-    </div>
-  `
+  // 네비게이션만 업데이트 (탭 활성화 상태)
+  const navContainer = document.querySelector('.max-w-7xl.mx-auto.px-4.py-6')
+  if (navContainer && navContainer.previousElementSibling) {
+    navContainer.previousElementSibling.outerHTML = renderNavigation()
+  }
   
-  // 페이지별 데이터 로드
-  if (state.currentPage === 'orders') {
-    fetchOrders()
-  } else if (state.currentPage === 'todos') {
+  // 모든 탭 숨기기
+  document.querySelectorAll('.tab-content').forEach(tab => {
+    tab.style.display = 'none'
+  })
+  
+  // 현재 탭만 보이기
+  const currentTab = document.getElementById(`tab-${state.currentPage}`)
+  if (currentTab) {
+    currentTab.style.display = 'block'
+  }
+  
+  // 페이지별 초기화 (첫 렌더링 또는 페이지 전환 시)
+  if (isFirstRender || state.currentPage === 'orders') {
+    if (state.currentPage === 'orders' && !state.orders.length) {
+      fetchOrders()
+    }
+  }
+  
+  if (state.currentPage === 'create-order' && isFirstRender) {
+    setTimeout(() => renderInputContent(), 0)
+  }
+  
+  if (state.currentPage === 'todos' && isFirstRender) {
     fetchTodos()
-  } else if (state.currentPage === 'codes') {
-    // 코드 데이터는 이미 로드됨 (무한 루프 방지 - render() 호출 제거)
   }
 }
 
