@@ -365,77 +365,91 @@ app.post('/api/orders', async (c) => {
 
 // 오더 수정
 app.put('/api/orders/:id', async (c) => {
-  const { env } = c
-  const id = c.req.param('id')
-  const body = await c.req.json()
-  
-  const {
-    order_type, billing_company, shipper, work_site, work_site_code,
-    contact_person, contact_phone, work_datetime,
-    booking_number, container_size, shipping_line, vessel_name,
-    export_country, berth_date, departure_date, weight,
-    container_number, tw, seal_number,
-    bl_number, do_status, customs_clearance, order_no,
-    loading_location, loading_location_code,
-    unloading_location, unloading_location_code,
-    dispatch_company, vehicle_info, status, weighing_required
-  } = body
-  
-  await env.DB.prepare(`
-    UPDATE transport_orders SET
-      order_type = ?, billing_company = ?, shipper = ?, work_site = ?, work_site_code = ?,
-      contact_person = ?, contact_phone = ?, work_datetime = ?,
-      booking_number = ?, container_size = ?, shipping_line = ?, vessel_name = ?,
-      export_country = ?, berth_date = ?, departure_date = ?, weight = ?,
-      container_number = ?, tw = ?, seal_number = ?,
-      bl_number = ?, do_status = ?, customs_clearance = ?, order_no = ?,
-      loading_location = ?, loading_location_code = ?,
-      unloading_location = ?, unloading_location_code = ?,
-      dispatch_company = ?, vehicle_info = ?, status = ?, weighing_required = ?,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).bind(
-    order_type, billing_company, shipper, work_site, work_site_code,
-    contact_person, contact_phone, work_datetime,
-    booking_number, container_size, shipping_line, vessel_name,
-    export_country, berth_date, departure_date, weight,
-    container_number, tw, seal_number,
-    bl_number, do_status, customs_clearance, order_no,
-    loading_location, loading_location_code,
-    unloading_location, unloading_location_code,
-    dispatch_company, vehicle_info, status, weighing_required,
-    id
-  ).run()
-  
-  // 청구처-화주 자동 학습: 새로운 조합이면 자동으로 billing_shippers에 추가
-  if (billing_company && shipper) {
-    try {
-      // billing_company_sales에서 청구처 ID 조회
-      const billingCompanySales = await env.DB.prepare(
-        'SELECT id FROM billing_company_sales WHERE billing_company = ?'
-      ).bind(billing_company).first()
-      
-      if (billingCompanySales) {
-        // 이미 등록된 화주인지 확인
-        const existingShipper = await env.DB.prepare(
-          'SELECT id FROM billing_shippers WHERE billing_company_id = ? AND shipper_name = ?'
-        ).bind(billingCompanySales.id, shipper).first()
+  try {
+    const { env } = c
+    const id = c.req.param('id')
+    const body = await c.req.json()
+    
+    const {
+      order_type, billing_company, shipper, work_site, work_site_code,
+      contact_person, contact_phone, work_datetime,
+      booking_number, container_size, shipping_line, vessel_name,
+      export_country, berth_date, departure_date, weight,
+      container_number, tw, seal_number,
+      bl_number, do_status, customs_clearance, order_no,
+      loading_location, loading_location_code,
+      unloading_location, unloading_location_code,
+      dispatch_company, vehicle_info, status, weighing_required
+    } = body
+    
+    console.log(`🔄 오더 수정 시작: ID ${id}`)
+    console.log('수정 데이터:', body)
+    
+    const result = await env.DB.prepare(`
+      UPDATE transport_orders SET
+        order_type = ?, billing_company = ?, shipper = ?, work_site = ?, work_site_code = ?,
+        contact_person = ?, contact_phone = ?, work_datetime = ?,
+        booking_number = ?, container_size = ?, shipping_line = ?, vessel_name = ?,
+        export_country = ?, berth_date = ?, departure_date = ?, weight = ?,
+        container_number = ?, tw = ?, seal_number = ?,
+        bl_number = ?, do_status = ?, customs_clearance = ?, order_no = ?,
+        loading_location = ?, loading_location_code = ?,
+        unloading_location = ?, unloading_location_code = ?,
+        dispatch_company = ?, vehicle_info = ?, status = ?, weighing_required = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      order_type, billing_company, shipper, work_site, work_site_code,
+      contact_person, contact_phone, work_datetime,
+      booking_number, container_size, shipping_line, vessel_name,
+      export_country, berth_date, departure_date, weight,
+      container_number, tw, seal_number,
+      bl_number, do_status, customs_clearance, order_no,
+      loading_location, loading_location_code,
+      unloading_location, unloading_location_code,
+      dispatch_company, vehicle_info, status, weighing_required,
+      id
+    ).run()
+    
+    console.log(`✅ 오더 수정 완료: ID ${id}, Changes: ${result.meta.changes}`)
+    
+    // 청구처-화주 자동 학습: 새로운 조합이면 자동으로 billing_shippers에 추가
+    if (billing_company && shipper) {
+      try {
+        // billing_company_sales에서 청구처 ID 조회
+        const billingCompanySales = await env.DB.prepare(
+          'SELECT id FROM billing_company_sales WHERE billing_company = ?'
+        ).bind(billing_company).first()
         
-        // 없으면 자동으로 추가
-        if (!existingShipper) {
-          await env.DB.prepare(
-            'INSERT INTO billing_shippers (billing_company_id, shipper_name, memo) VALUES (?, ?, ?)'
-          ).bind(billingCompanySales.id, shipper, '자동 학습').run()
-          console.log(`✅ 자동 학습: ${billing_company} → ${shipper}`)
+        if (billingCompanySales) {
+          // 이미 등록된 화주인지 확인
+          const existingShipper = await env.DB.prepare(
+            'SELECT id FROM billing_shippers WHERE billing_company_id = ? AND shipper_name = ?'
+          ).bind(billingCompanySales.id, shipper).first()
+          
+          // 없으면 자동으로 추가
+          if (!existingShipper) {
+            await env.DB.prepare(
+              'INSERT INTO billing_shippers (billing_company_id, shipper_name, memo) VALUES (?, ?, ?)'
+            ).bind(billingCompanySales.id, shipper, '자동 학습').run()
+            console.log(`✅ 자동 학습: ${billing_company} → ${shipper}`)
+          }
         }
+      } catch (error) {
+        console.error('Auto-learning shipper error:', error)
+        // 학습 실패해도 오더 수정은 계속 진행
       }
-    } catch (error) {
-      console.error('Auto-learning shipper error:', error)
-      // 학습 실패해도 오더 수정은 계속 진행
     }
+    
+    return c.json({ message: '오더가 수정되었습니다' })
+  } catch (error: any) {
+    console.error('❌ 오더 수정 실패:', error)
+    return c.json({ 
+      error: '오더 수정에 실패했습니다', 
+      message: error.message,
+      stack: error.stack 
+    }, 500)
   }
-  
-  return c.json({ message: '오더가 수정되었습니다' })
 })
 
 // 오더 삭제
