@@ -1271,6 +1271,7 @@ ${order.order_type === 'container_export' || order.order_type === 'container_imp
 컨테이너 번호: ${order.container_number || '-'}
 씰 번호: ${order.seal_number || '-'}
 T.W: ${order.tw || '-'}` : ''}
+${order.order_type === 'lcl' && order.container_size ? `차량 종류: ${order.container_size}` : ''}
 ${order.shipping_line ? `선사: ${order.shipping_line}` : ''}
 ${order.vessel_name ? `모선: ${order.vessel_name}` : ''}
 ${order.export_country ? `수출국: ${order.export_country}` : ''}
@@ -1280,10 +1281,14 @@ ${order.weight ? `중량: ${order.weight}` : ''}
 ${order.bl_number ? `BL: ${order.bl_number}` : ''}
 ${order.do_status ? `DO: ${order.do_status}` : ''}
 ${order.customs_clearance ? `통관: ${order.customs_clearance}` : ''}
+${order.order_no ? `오더번호: ${order.order_no}` : ''}
 
 ${order.loading_location ? `상차지: ${order.loading_location}` : ''}
+${order.loading_location_code ? `상차지 코드: ${order.loading_location_code}` : ''}
 ${order.unloading_location ? `하차지: ${order.unloading_location}` : ''}
+${order.unloading_location_code ? `하차지 코드: ${order.unloading_location_code}` : ''}
 ${order.work_site ? `작업지: ${order.work_site}` : ''}
+${order.work_site_code ? `작업지 코드: ${order.work_site_code}` : ''}
 
 배차업체: ${order.dispatch_company || '⚠️ 미지정'}
 차량정보: ${order.vehicle_info || '미배정'}
@@ -1461,6 +1466,7 @@ async function saveOrderEdit(orderId) {
       }
       else if (key === 'BKG/BL') updates.booking_number = value
       else if (key === '컨테이너') updates.container_size = value
+      else if (key === '차량 종류') updates.container_size = value
       else if (key === '컨테이너 번호') updates.container_number = value
       else if (key === '씰 번호') updates.seal_number = value
       else if (key === 'T.W') updates.tw = value
@@ -1473,9 +1479,13 @@ async function saveOrderEdit(orderId) {
       else if (key === 'BL') updates.bl_number = value
       else if (key === 'DO') updates.do_status = value
       else if (key === '통관') updates.customs_clearance = value
+      else if (key === '오더번호') updates.order_no = value
       else if (key === '상차지') updates.loading_location = value
+      else if (key === '상차지 코드') updates.loading_location_code = value
       else if (key === '하차지') updates.unloading_location = value
+      else if (key === '하차지 코드') updates.unloading_location_code = value
       else if (key === '작업지') updates.work_site = value
+      else if (key === '작업지 코드') updates.work_site_code = value
       else if (key === '배차업체') updates.dispatch_company = value
       else if (key === '차량정보') updates.vehicle_info = value
       else if (key === '담당자') {
