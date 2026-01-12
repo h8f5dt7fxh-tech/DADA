@@ -1274,8 +1274,9 @@ ${order.tw ? `T.W: ${order.tw}` : ''}
 ${order.shipping_line ? `선사: ${order.shipping_line}` : ''}
 ${order.vessel_name ? `모선: ${order.vessel_name}` : ''}
 
-${order.order_type === 'lcl' ? `상차지: ${order.loading_location || '미정'}
-하차지: ${order.unloading_location || '미정'}` : order.work_site ? `작업지: ${order.work_site}` : ''}
+${order.loading_location ? `상차지: ${order.loading_location}` : ''}
+${order.unloading_location ? `하차지: ${order.unloading_location}` : ''}
+${order.work_site ? `작업지: ${order.work_site}` : ''}
 
 배차업체: ${order.dispatch_company || '⚠️ 미지정'}
 차량정보: ${order.vehicle_info || '미배정'}
