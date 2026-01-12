@@ -1435,11 +1435,11 @@ async function saveOrderEdit(orderId) {
   }
   
   // 텍스트 파싱
-  const lines = text.split('\\n')
+  const lines = text.split('\n')  // ✅ 수정: \\n → \n
   const updates = {}
   
   lines.forEach(line => {
-    const match = line.match(/^([^:]+):\\s*(.+)$/)
+    const match = line.match(/^([^:]+):\s*(.+)$/)
     if (match) {
       const key = match[1].trim()
       const value = match[2].trim()
@@ -1447,9 +1447,15 @@ async function saveOrderEdit(orderId) {
       // 필드 매핑
       if (key === '청구처') updates.billing_company = value
       else if (key === '화주') updates.shipper = value
-      else if (key === '작업일시') updates.work_datetime = value.replace(/\\./g, '-').replace(' ', ' ')
+      else if (key === '작업일시' || key === '진행일시') {
+        // 날짜 형식 변환: 2026.01.19 13:00 → 2026-01-19 13:00
+        updates.work_datetime = value.replace(/\./g, '-')
+      }
       else if (key === 'BKG/BL') updates.booking_number = value
       else if (key === '컨테이너') updates.container_size = value
+      else if (key === '컨테이너 번호') updates.container_number = value
+      else if (key === '씰 번호') updates.seal_number = value
+      else if (key === 'T.W') updates.tw = value
       else if (key === '선사') updates.shipping_line = value
       else if (key === '모선') updates.vessel_name = value
       else if (key === '상차지') updates.loading_location = value
@@ -1465,6 +1471,11 @@ async function saveOrderEdit(orderId) {
     }
   })
   
+  if (Object.keys(updates).length === 0) {
+    alert('수정할 내용이 없습니다.')
+    return
+  }
+  
   try {
     await axios.put(`/api/orders/${orderId}`, updates)
     alert('수정되었습니다.')
@@ -1479,7 +1490,7 @@ async function saveOrderEdit(orderId) {
     }
   } catch (error) {
     console.error('수정 실패:', error)
-    alert('수정에 실패했습니다.')
+    alert('수정에 실패했습니다: ' + (error.response?.data?.error || error.message))
   }
 }
 
