@@ -1273,6 +1273,13 @@ ${order.order_type === 'container_export' || order.order_type === 'container_imp
 T.W: ${order.tw || '-'}` : ''}
 ${order.shipping_line ? `선사: ${order.shipping_line}` : ''}
 ${order.vessel_name ? `모선: ${order.vessel_name}` : ''}
+${order.export_country ? `수출국: ${order.export_country}` : ''}
+${order.berth_date ? `접안일: ${order.berth_date}` : ''}
+${order.departure_date ? `출항일: ${order.departure_date}` : ''}
+${order.weight ? `중량: ${order.weight}` : ''}
+${order.bl_number ? `BL: ${order.bl_number}` : ''}
+${order.do_status ? `DO: ${order.do_status}` : ''}
+${order.customs_clearance ? `통관: ${order.customs_clearance}` : ''}
 
 ${order.loading_location ? `상차지: ${order.loading_location}` : ''}
 ${order.unloading_location ? `하차지: ${order.unloading_location}` : ''}
@@ -1459,6 +1466,13 @@ async function saveOrderEdit(orderId) {
       else if (key === 'T.W') updates.tw = value
       else if (key === '선사') updates.shipping_line = value
       else if (key === '모선') updates.vessel_name = value
+      else if (key === '수출국') updates.export_country = value
+      else if (key === '접안일') updates.berth_date = value
+      else if (key === '출항일') updates.departure_date = value
+      else if (key === '중량') updates.weight = value
+      else if (key === 'BL') updates.bl_number = value
+      else if (key === 'DO') updates.do_status = value
+      else if (key === '통관') updates.customs_clearance = value
       else if (key === '상차지') updates.loading_location = value
       else if (key === '하차지') updates.unloading_location = value
       else if (key === '작업지') updates.work_site = value
