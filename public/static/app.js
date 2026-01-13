@@ -3696,7 +3696,31 @@ async function bulkCreateOrders() {
   
   const orders = window.parsedOrdersCache
   
-  if (!confirm(`${orders.length}건의 오더를 생성하시겠습니까?`)) {
+  // ✅ 필수 필드 검증 (청구처, 화주, 오더타입)
+  const invalidOrders = []
+  orders.forEach((order, index) => {
+    if (!order.billing_company || !order.shipper || !order.order_type) {
+      invalidOrders.push({
+        index: index + 1,
+        order,
+        missing: [
+          !order.billing_company && '청구처',
+          !order.shipper && '화주',
+          !order.order_type && '오더타입'
+        ].filter(Boolean)
+      })
+    }
+  })
+  
+  if (invalidOrders.length > 0) {
+    const errorMsg = invalidOrders.map(item => 
+      `오더 #${item.index}: ${item.missing.join(', ')} 누락`
+    ).join('\n')
+    alert(`⚠️ 다음 오더의 필수 정보가 누락되었습니다:\n\n${errorMsg}\n\n필수 정보: 청구처, 화주`)
+    return
+  }
+  
+  if (!confirm(`${orders.length}건의 오더를 생성하시겠습니까?\n\n등록 후 수정 가능하니 안심하세요! 😊`)) {
     return
   }
   
@@ -3710,9 +3734,16 @@ async function bulkCreateOrders() {
   let successCount = 0
   let failCount = 0
   const errors = []
+  const failedOrders = []
   
   for (let i = 0; i < orders.length; i++) {
     try {
+      console.log(`\n📝 오더 #${i+1} 등록 시작:`, {
+        billing_company: orders[i].billing_company,
+        shipper: orders[i].shipper,
+        order_type: orders[i].order_type
+      })
+      
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3720,18 +3751,28 @@ async function bulkCreateOrders() {
       })
       
       if (response.ok) {
+        const result = await response.json()
         successCount++
         btnText.textContent = `생성 중... (${successCount}/${orders.length})`
+        console.log(`✅ 오더 #${i+1} 등록 성공! ID: ${result.orderId}`)
       } else {
         failCount++
         const errorData = await response.json().catch(() => ({ error: '알 수 없는 오류' }))
-        errors.push(`오더 #${i+1}: ${errorData.error || response.statusText}`)
-        console.error(`오더 생성 실패 #${i+1}:`, errorData)
+        const errorMsg = `오더 #${i+1} (${orders[i].billing_company} - ${orders[i].shipper}): ${errorData.error || errorData.message || response.statusText}`
+        errors.push(errorMsg)
+        failedOrders.push({ index: i + 1, order: orders[i], error: errorData })
+        console.error(`❌ ${errorMsg}`, errorData)
       }
+      
+      // API 과부하 방지 (100ms 딜레이)
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
     } catch (error) {
       failCount++
-      errors.push(`오더 #${i+1}: ${error.message}`)
-      console.error(`오더 생성 에러 #${i+1}:`, error)
+      const errorMsg = `오더 #${i+1} (${orders[i].billing_company} - ${orders[i].shipper}): 네트워크 오류 - ${error.message}`
+      errors.push(errorMsg)
+      failedOrders.push({ index: i + 1, order: orders[i], error: error.message })
+      console.error(`❌ ${errorMsg}`, error)
     }
   }
   
@@ -3739,15 +3780,28 @@ async function bulkCreateOrders() {
   btnText.textContent = originalText
   
   if (failCount === 0) {
-    alert(`✅ ${successCount}건의 오더가 모두 성공적으로 생성되었습니다!`)
+    alert(`✅ ${successCount}건의 오더가 모두 성공적으로 생성되었습니다!\n\n일별현황에서 확인하세요! 🎉`)
     // 입력 초기화
     document.getElementById('orderTextInput').value = ''
     updateOrderPreview()
     // 오더 목록으로 이동
     changePage('orders')
   } else {
-    console.error('오더 생성 실패 상세:', errors)
-    alert(`⚠️ 생성 완료: ${successCount}건 성공, ${failCount}건 실패\n\n실패 상세:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...(더 많은 오류는 콘솔 확인)' : ''}`)
+    console.error('❌ 오더 생성 실패 상세:', errors)
+    console.error('❌ 실패한 오더:', failedOrders)
+    
+    // 실패한 오더를 localStorage에 저장
+    localStorage.setItem('failedOrders', JSON.stringify(failedOrders))
+    
+    const errorSummary = errors.slice(0, 3).join('\n')
+    const moreErrors = errors.length > 3 ? `\n... 외 ${errors.length - 3}건 (콘솔 확인)` : ''
+    
+    alert(`⚠️ 등록 결과:\n✅ 성공: ${successCount}건\n❌ 실패: ${failCount}건\n\n실패 상세:\n${errorSummary}${moreErrors}\n\n💡 실패한 오더는 다시 시도할 수 있습니다.\n   콘솔(F12)에서 상세 정보를 확인하세요.`)
+    
+    // 성공한 오더가 있으면 목록 새로고침
+    if (successCount > 0) {
+      fetchOrders()
+    }
   }
 }
 
