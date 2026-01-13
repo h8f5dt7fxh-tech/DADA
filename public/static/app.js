@@ -947,8 +947,18 @@ function renderNavigation() {
           ${state.openedTabs.map(tabId => {
             const config = tabConfig[tabId]
             const isActive = state.currentPage === tabId
+            
+            // 각 탭별 색상 매핑 (Tailwind 동적 클래스 문제 해결)
+            const activeColors = {
+              'orders': 'bg-blue-50 border-blue-600 text-blue-800',
+              'create-order': 'bg-green-50 border-green-600 text-green-800',
+              'clients': 'bg-purple-50 border-purple-600 text-purple-800',
+              'codes': 'bg-orange-50 border-orange-600 text-orange-800',
+              'todos': 'bg-red-50 border-red-600 text-red-800'
+            }
+            
             const colorClass = isActive 
-              ? `bg-${config.color}-50 border-t-4 border-${config.color}-600 text-${config.color}-800` 
+              ? `${activeColors[tabId]} border-t-4` 
               : 'bg-gray-100 border-t-4 border-transparent text-gray-600 hover:bg-gray-200'
             
             return `
@@ -968,13 +978,22 @@ function renderNavigation() {
               <i class="fas fa-plus text-sm"></i>
             </button>
             <div id="newTabMenu" class="hidden absolute top-full left-0 mt-1 bg-white border rounded-lg shadow-lg z-50 w-48">
-              ${Object.entries(tabConfig).filter(([tabId]) => !state.openedTabs.includes(tabId)).map(([tabId, config]) => `
-                <button onclick="changePage('${tabId}'); toggleNewTabMenu()" 
-                        class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 flex items-center">
-                  <i class="${config.icon} mr-2 text-${config.color}-600"></i>
-                  <span>${config.label}</span>
-                </button>
-              `).join('')}
+              ${Object.entries(tabConfig).filter(([tabId]) => !state.openedTabs.includes(tabId)).map(([tabId, config]) => {
+                const iconColors = {
+                  'orders': 'text-blue-600',
+                  'create-order': 'text-green-600',
+                  'clients': 'text-purple-600',
+                  'codes': 'text-orange-600',
+                  'todos': 'text-red-600'
+                }
+                return `
+                  <button onclick="changePage('${tabId}'); toggleNewTabMenu()" 
+                          class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 flex items-center">
+                    <i class="${config.icon} mr-2 ${iconColors[tabId]}"></i>
+                    <span>${config.label}</span>
+                  </button>
+                `
+              }).join('')}
               ${state.openedTabs.length === 5 ? '<div class="px-4 py-2 text-gray-400 text-sm">모든 탭이 열려있습니다</div>' : ''}
             </div>
           </div>
@@ -1010,9 +1029,19 @@ function renderNavigation() {
         ${state.openedTabs.map(tabId => {
           const config = tabConfig[tabId]
           const isActive = state.currentPage === tabId
+          
+          // 모바일 메뉴용 고정 색상
+          const mobileActiveColors = {
+            'orders': 'bg-blue-600 text-white shadow-md',
+            'create-order': 'bg-green-600 text-white shadow-md',
+            'clients': 'bg-purple-600 text-white shadow-md',
+            'codes': 'bg-orange-600 text-white shadow-md',
+            'todos': 'bg-red-600 text-white shadow-md'
+          }
+          
           return `
             <button onclick="changePage('${tabId}'); toggleMobileMenu()" 
-                    class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${isActive ? `bg-${config.color}-600 text-white shadow-md` : 'hover:bg-gray-100 text-gray-700'}">
+                    class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${isActive ? mobileActiveColors[tabId] : 'hover:bg-gray-100 text-gray-700'}">
               <i class="${config.icon} mr-2"></i>${config.label}
             </button>
           `
