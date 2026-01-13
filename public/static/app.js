@@ -3293,8 +3293,12 @@ function viewOrderDetail(id) {
         <h3 class="text-2xl font-bold">오더 상세</h3>
         <div class="flex items-center space-x-2">
           <button onclick="editOrder(${order.id})" 
-                  class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                  class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
             <i class="fas fa-edit mr-2"></i>수정
+          </button>
+          <button onclick="if(confirm('정말 삭제하시겠습니까?')) { deleteOrder(${order.id}); this.closest('.fixed').remove(); }" 
+                  class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
+            <i class="fas fa-trash mr-2"></i>삭제
           </button>
           <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800 px-3 py-2">
             <i class="fas fa-times text-2xl"></i>
