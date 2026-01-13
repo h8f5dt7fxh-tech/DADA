@@ -909,8 +909,11 @@ window.showShipperQuick = async function(billingCompanyId, shipperId, shipperNam
 // ============================================
 
 function renderNavigation() {
-  // 열려있는 탭들 (방문한 페이지들)
-  const openedTabs = ['orders', 'create-order', 'clients', 'codes', 'todos']
+  // 열려있는 탭들 (방문한 페이지들) - state.openedTabs에 기록
+  if (!state.openedTabs) {
+    state.openedTabs = ['orders'] // 기본으로 오더 관리 탭은 열려있음
+  }
+  
   const tabConfig = {
     'orders': { label: '오더 관리', icon: 'fas fa-list', color: 'blue' },
     'create-order': { label: '오더 입력', icon: 'fas fa-plus', color: 'green' },
@@ -939,9 +942,9 @@ function renderNavigation() {
           </div>
         </div>
         
-        <!-- 하단: 크롬 스타일 탭들 -->
+        <!-- 하단: 크롬 스타일 탭들 (열려있는 탭만 표시) -->
         <div class="flex items-end h-10 space-x-1 overflow-x-auto desktop-nav">
-          ${openedTabs.map(tabId => {
+          ${state.openedTabs.map(tabId => {
             const config = tabConfig[tabId]
             const isActive = state.currentPage === tabId
             const colorClass = isActive 
@@ -950,13 +953,31 @@ function renderNavigation() {
             
             return `
               <button onclick="changePage('${tabId}')" 
-                      class="tab-item flex items-center px-4 py-2 rounded-t-lg border-l border-r border-gray-300 ${colorClass} transition-all duration-200 min-w-max ${isActive ? 'shadow-md' : ''}">
+                      class="tab-item flex items-center px-3 py-2 rounded-t-lg border-l border-r border-gray-300 ${colorClass} transition-all duration-200 min-w-max ${isActive ? 'shadow-md' : ''}">
                 <i class="${config.icon} mr-2 text-sm"></i>
                 <span class="font-semibold text-sm">${config.label}</span>
                 ${isActive ? '<i class="fas fa-circle ml-2 text-xs"></i>' : ''}
+                ${!isActive ? `<button onclick="event.stopPropagation(); closeTab('${tabId}')" class="ml-2 text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xs"></i></button>` : ''}
               </button>
             `
           }).join('')}
+          
+          <!-- 새 탭 추가 버튼 -->
+          <div class="relative inline-block">
+            <button onclick="toggleNewTabMenu()" class="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-t-lg transition-all">
+              <i class="fas fa-plus text-sm"></i>
+            </button>
+            <div id="newTabMenu" class="hidden absolute top-full left-0 mt-1 bg-white border rounded-lg shadow-lg z-50 w-48">
+              ${Object.entries(tabConfig).filter(([tabId]) => !state.openedTabs.includes(tabId)).map(([tabId, config]) => `
+                <button onclick="changePage('${tabId}'); toggleNewTabMenu()" 
+                        class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 flex items-center">
+                  <i class="${config.icon} mr-2 text-${config.color}-600"></i>
+                  <span>${config.label}</span>
+                </button>
+              `).join('')}
+              ${state.openedTabs.length === 5 ? '<div class="px-4 py-2 text-gray-400 text-sm">모든 탭이 열려있습니다</div>' : ''}
+            </div>
+          </div>
         </div>
         
         <!-- 모바일 네비게이션 -->
@@ -986,7 +1007,7 @@ function renderNavigation() {
         </button>
       </div>
       <div class="p-4">
-        ${openedTabs.map(tabId => {
+        ${state.openedTabs.map(tabId => {
           const config = tabConfig[tabId]
           const isActive = state.currentPage === tabId
           return `
@@ -996,8 +1017,6 @@ function renderNavigation() {
             </button>
           `
         }).join('')}
-          <i class="fas fa-tasks mr-2"></i>할일
-        </button>
       </div>
     </div>
   `
@@ -2902,6 +2921,15 @@ async function handleExcelUpload(event) {
 
 function changePage(page) {
   state.currentPage = page
+  
+  // 열려있는 탭 목록에 추가 (중복 방지)
+  if (!state.openedTabs) {
+    state.openedTabs = ['orders']
+  }
+  if (!state.openedTabs.includes(page)) {
+    state.openedTabs.push(page)
+  }
+  
   if (page === 'create-order') {
     state.inputMode = 'text'  // 오더 입력 페이지 진입 시 텍스트 모드로 초기화
   }
@@ -2921,6 +2949,41 @@ function changePage(page) {
     }
   }
 }
+
+function closeTab(tabId) {
+  // 오더 관리 탭은 닫을 수 없음 (기본 탭)
+  if (tabId === 'orders') {
+    alert('오더 관리 탭은 닫을 수 없습니다.')
+    return
+  }
+  
+  // 열려있는 탭 목록에서 제거
+  state.openedTabs = state.openedTabs.filter(t => t !== tabId)
+  
+  // 현재 활성 탭이 닫히는 경우, 가장 오른쪽 탭으로 이동
+  if (state.currentPage === tabId) {
+    const lastTab = state.openedTabs[state.openedTabs.length - 1]
+    changePage(lastTab)
+  } else {
+    // 네비게이션만 다시 렌더링
+    render()
+  }
+}
+
+function toggleNewTabMenu() {
+  const menu = document.getElementById('newTabMenu')
+  if (menu) {
+    menu.classList.toggle('hidden')
+  }
+}
+
+// 메뉴 외부 클릭 시 닫기
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('newTabMenu')
+  if (menu && !menu.classList.contains('hidden') && !e.target.closest('.relative')) {
+    menu.classList.add('hidden')
+  }
+})
 
 function changeInputMode(mode) {
   state.inputMode = mode
