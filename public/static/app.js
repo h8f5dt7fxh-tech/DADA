@@ -910,29 +910,29 @@ window.showShipperQuick = async function(billingCompanyId, shipperId, shipperNam
 
 function renderNavigation() {
   return `
-    <nav class="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
+    <nav class="bg-white shadow-md border-b-2 border-gray-200 fixed top-0 left-0 right-0 z-50">
       <div class="max-w-7xl mx-auto px-4">
         <div class="flex items-center justify-between h-16">
           <!-- 데스크톱 네비게이션 -->
           <div class="flex items-center space-x-8 desktop-nav w-full">
             <h1 class="text-xl font-bold text-gray-800">
-              <i class="fas fa-truck mr-2"></i>운송사 관리 시스템
+              <i class="fas fa-truck mr-2 text-blue-600"></i>운송사 관리 시스템
             </h1>
-            <div class="flex space-x-4">
-              <button onclick="changePage('orders')" class="nav-link ${state.currentPage === 'orders' ? 'tab-active' : ''} px-3 py-2">
-                <i class="fas fa-list mr-1"></i>오더 관리
+            <div class="flex space-x-2">
+              <button onclick="changePage('orders')" class="nav-link ${state.currentPage === 'orders' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'orders' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-list mr-2"></i>오더 관리
               </button>
-              <button onclick="changePage('create-order')" class="nav-link ${state.currentPage === 'create-order' ? 'tab-active' : ''} px-3 py-2">
-                <i class="fas fa-plus mr-1"></i>오더 입력
+              <button onclick="changePage('create-order')" class="nav-link ${state.currentPage === 'create-order' ? 'bg-green-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'create-order' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-plus mr-2"></i>오더 입력
               </button>
-              <button onclick="changePage('clients')" class="nav-link ${state.currentPage === 'clients' ? 'tab-active' : ''} px-3 py-2">
-                <i class="fas fa-building mr-1"></i>거래처 관리
+              <button onclick="changePage('clients')" class="nav-link ${state.currentPage === 'clients' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'clients' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-building mr-2"></i>거래처 관리
               </button>
-              <button onclick="changePage('codes')" class="nav-link ${state.currentPage === 'codes' ? 'tab-active' : ''} px-3 py-2">
-                <i class="fas fa-code mr-1"></i>코드 관리
+              <button onclick="changePage('codes')" class="nav-link ${state.currentPage === 'codes' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'codes' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-code mr-2"></i>코드 관리
               </button>
-              <button onclick="changePage('todos')" class="nav-link ${state.currentPage === 'todos' ? 'tab-active' : ''} px-3 py-2">
-                <i class="fas fa-tasks mr-1"></i>할일
+              <button onclick="changePage('todos')" class="nav-link ${state.currentPage === 'todos' ? 'bg-red-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'todos' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-tasks mr-2"></i>할일
               </button>
             </div>
             
@@ -941,7 +941,7 @@ function renderNavigation() {
               <input type="text" 
                      id="quickShipperSearch"
                      placeholder="화주 검색..."
-                     class="px-4 py-2 border rounded-lg text-sm w-64 focus:outline-none focus:border-blue-500"
+                     class="px-4 py-2 border rounded-lg text-sm w-64 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                      onkeyup="quickSearchShipper(event)">
               <div id="quickSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-96 overflow-y-auto hidden z-50"></div>
             </div>
@@ -950,7 +950,7 @@ function renderNavigation() {
           <!-- 모바일 네비게이션 -->
           <div class="mobile-nav flex items-center justify-between w-full" style="display: none;">
             <h1 class="text-lg font-bold text-gray-800">
-              <i class="fas fa-truck mr-2"></i>운송 관리
+              <i class="fas fa-truck mr-2 text-blue-600"></i>운송 관리
             </h1>
             <button onclick="toggleMobileMenu()" class="p-2 text-gray-600 hover:text-gray-900">
               <i class="fas fa-bars text-2xl"></i>
@@ -975,19 +975,19 @@ function renderNavigation() {
         </button>
       </div>
       <div class="p-4">
-        <button onclick="changePage('orders'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'orders' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+        <button onclick="changePage('orders'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'orders' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
           <i class="fas fa-list mr-2"></i>오더 관리
         </button>
-        <button onclick="changePage('create-order'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'create-order' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+        <button onclick="changePage('create-order'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'create-order' ? 'bg-green-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
           <i class="fas fa-plus mr-2"></i>오더 입력
         </button>
-        <button onclick="changePage('clients'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'clients' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+        <button onclick="changePage('clients'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'clients' ? 'bg-purple-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
           <i class="fas fa-building mr-2"></i>거래처 관리
         </button>
-        <button onclick="changePage('codes'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'codes' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+        <button onclick="changePage('codes'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'codes' ? 'bg-orange-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
           <i class="fas fa-code mr-2"></i>코드 관리
         </button>
-        <button onclick="changePage('todos'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded mb-2 ${state.currentPage === 'todos' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}">
+        <button onclick="changePage('todos'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'todos' ? 'bg-red-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
           <i class="fas fa-tasks mr-2"></i>할일
         </button>
       </div>
