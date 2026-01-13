@@ -909,110 +909,59 @@ window.showShipperQuick = async function(billingCompanyId, shipperId, shipperNam
 // ============================================
 
 function renderNavigation() {
-  // 열려있는 탭들 (방문한 페이지들) - state.openedTabs에 기록
-  if (!state.openedTabs) {
-    state.openedTabs = ['orders'] // 기본으로 오더 관리 탭은 열려있음
-  }
-  
-  const tabConfig = {
-    'orders': { label: '오더 관리', icon: 'fas fa-list', color: 'blue' },
-    'create-order': { label: '오더 입력', icon: 'fas fa-plus', color: 'green' },
-    'clients': { label: '거래처 관리', icon: 'fas fa-building', color: 'purple' },
-    'codes': { label: '코드 관리', icon: 'fas fa-code', color: 'orange' },
-    'todos': { label: '할일', icon: 'fas fa-tasks', color: 'red' }
-  }
-  
   return `
     <nav class="bg-white shadow-md border-b-2 border-gray-200 fixed top-0 left-0 right-0 z-50">
       <div class="max-w-7xl mx-auto px-4">
-        <!-- 상단: 로고 + 검색 -->
-        <div class="flex items-center justify-between h-12 border-b border-gray-200">
-          <h1 class="text-lg font-bold text-gray-800">
-            <i class="fas fa-truck mr-2 text-blue-600"></i>운송사 관리 시스템
-          </h1>
-          
-          <!-- 화주 빠른 검색 -->
-          <div class="relative">
-            <input type="text" 
-                   id="quickShipperSearch"
-                   placeholder="화주 검색..."
-                   class="px-4 py-1.5 border rounded-lg text-sm w-64 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                   onkeyup="quickSearchShipper(event)">
-            <div id="quickSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-96 overflow-y-auto hidden z-50"></div>
-          </div>
-        </div>
-        
-        <!-- 하단: 크롬 스타일 탭들 (열려있는 탭만 표시) -->
-        <div class="flex items-end h-10 space-x-1 overflow-x-auto desktop-nav">
-          ${state.openedTabs.map(tabId => {
-            const config = tabConfig[tabId]
-            const isActive = state.currentPage === tabId
-            
-            // 각 탭별 색상 매핑 (Tailwind 동적 클래스 문제 해결)
-            const activeColors = {
-              'orders': 'bg-blue-50 border-blue-600 text-blue-800',
-              'create-order': 'bg-green-50 border-green-600 text-green-800',
-              'clients': 'bg-purple-50 border-purple-600 text-purple-800',
-              'codes': 'bg-orange-50 border-orange-600 text-orange-800',
-              'todos': 'bg-red-50 border-red-600 text-red-800'
-            }
-            
-            const colorClass = isActive 
-              ? `${activeColors[tabId]} border-t-4` 
-              : 'bg-gray-100 border-t-4 border-transparent text-gray-600 hover:bg-gray-200'
-            
-            return `
-              <button onclick="changePage('${tabId}')" 
-                      class="tab-item flex items-center px-3 py-2 rounded-t-lg border-l border-r border-gray-300 ${colorClass} transition-all duration-200 min-w-max ${isActive ? 'shadow-md' : ''}">
-                <i class="${config.icon} mr-2 text-sm"></i>
-                <span class="font-semibold text-sm">${config.label}</span>
-                ${isActive ? '<i class="fas fa-circle ml-2 text-xs"></i>' : ''}
-                ${!isActive ? `<button onclick="event.stopPropagation(); closeTab('${tabId}')" class="ml-2 text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xs"></i></button>` : ''}
+        <div class="flex items-center justify-between h-16">
+          <!-- 데스크톱 네비게이션 -->
+          <div class="flex items-center space-x-8 desktop-nav w-full">
+            <h1 class="text-xl font-bold text-gray-800">
+              <i class="fas fa-truck mr-2 text-blue-600"></i>운송사 관리 시스템
+            </h1>
+            <div class="flex space-x-2">
+              <button onclick="changePage('orders')" class="nav-link ${state.currentPage === 'orders' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'orders' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-list mr-2"></i>오더 관리
               </button>
-            `
-          }).join('')}
-          
-          <!-- 새 탭 추가 버튼 -->
-          <div class="relative inline-block">
-            <button onclick="toggleNewTabMenu()" class="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-t-lg transition-all">
-              <i class="fas fa-plus text-sm"></i>
-            </button>
-            <div id="newTabMenu" class="hidden absolute top-full left-0 mt-1 bg-white border rounded-lg shadow-lg z-50 w-48">
-              ${Object.entries(tabConfig).filter(([tabId]) => !state.openedTabs.includes(tabId)).map(([tabId, config]) => {
-                const iconColors = {
-                  'orders': 'text-blue-600',
-                  'create-order': 'text-green-600',
-                  'clients': 'text-purple-600',
-                  'codes': 'text-orange-600',
-                  'todos': 'text-red-600'
-                }
-                return `
-                  <button onclick="changePage('${tabId}'); toggleNewTabMenu()" 
-                          class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 flex items-center">
-                    <i class="${config.icon} mr-2 ${iconColors[tabId]}"></i>
-                    <span>${config.label}</span>
-                  </button>
-                `
-              }).join('')}
-              ${state.openedTabs.length === 5 ? '<div class="px-4 py-2 text-gray-400 text-sm">모든 탭이 열려있습니다</div>' : ''}
+              <button onclick="changePage('create-order')" class="nav-link ${state.currentPage === 'create-order' ? 'bg-green-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'create-order' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-plus mr-2"></i>오더 입력
+              </button>
+              <button onclick="changePage('clients')" class="nav-link ${state.currentPage === 'clients' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'clients' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-building mr-2"></i>거래처 관리
+              </button>
+              <button onclick="changePage('codes')" class="nav-link ${state.currentPage === 'codes' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'codes' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-code mr-2"></i>코드 관리
+              </button>
+              <button onclick="changePage('todos')" class="nav-link ${state.currentPage === 'todos' ? 'bg-red-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'} px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform ${state.currentPage === 'todos' ? 'scale-105' : 'hover:scale-105'}">
+                <i class="fas fa-tasks mr-2"></i>할일
+              </button>
+            </div>
+            
+            <!-- 화주 빠른 검색 -->
+            <div class="ml-auto relative">
+              <input type="text" 
+                     id="quickShipperSearch"
+                     placeholder="화주 검색..."
+                     class="px-4 py-2 border rounded-lg text-sm w-64 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                     onkeyup="quickSearchShipper(event)">
+              <div id="quickSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-96 overflow-y-auto hidden z-50"></div>
             </div>
           </div>
-        </div>
-        
-        <!-- 모바일 네비게이션 -->
-        <div class="mobile-nav flex items-center justify-between h-16" style="display: none;">
-          <h1 class="text-lg font-bold text-gray-800">
-            <i class="fas fa-truck mr-2 text-blue-600"></i>운송 관리
-          </h1>
-          <button onclick="toggleMobileMenu()" class="p-2 text-gray-600 hover:text-gray-900">
-            <i class="fas fa-bars text-2xl"></i>
-          </button>
+          
+          <!-- 모바일 네비게이션 -->
+          <div class="mobile-nav flex items-center justify-between w-full" style="display: none;">
+            <h1 class="text-lg font-bold text-gray-800">
+              <i class="fas fa-truck mr-2 text-blue-600"></i>운송 관리
+            </h1>
+            <button onclick="toggleMobileMenu()" class="p-2 text-gray-600 hover:text-gray-900">
+              <i class="fas fa-bars text-2xl"></i>
+            </button>
+          </div>
         </div>
       </div>
     </nav>
     
     <!-- 상단바 고정으로 인한 공간 확보 -->
-    <div style="height: 88px;"></div>
+    <div style="height: 64px;"></div>
     
     <!-- 모바일 메뉴 오버레이 -->
     <div id="menuOverlay" class="menu-overlay" onclick="toggleMobileMenu()"></div>
@@ -1026,26 +975,21 @@ function renderNavigation() {
         </button>
       </div>
       <div class="p-4">
-        ${state.openedTabs.map(tabId => {
-          const config = tabConfig[tabId]
-          const isActive = state.currentPage === tabId
-          
-          // 모바일 메뉴용 고정 색상
-          const mobileActiveColors = {
-            'orders': 'bg-blue-600 text-white shadow-md',
-            'create-order': 'bg-green-600 text-white shadow-md',
-            'clients': 'bg-purple-600 text-white shadow-md',
-            'codes': 'bg-orange-600 text-white shadow-md',
-            'todos': 'bg-red-600 text-white shadow-md'
-          }
-          
-          return `
-            <button onclick="changePage('${tabId}'); toggleMobileMenu()" 
-                    class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${isActive ? mobileActiveColors[tabId] : 'hover:bg-gray-100 text-gray-700'}">
-              <i class="${config.icon} mr-2"></i>${config.label}
-            </button>
-          `
-        }).join('')}
+        <button onclick="changePage('orders'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'orders' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
+          <i class="fas fa-list mr-2"></i>오더 관리
+        </button>
+        <button onclick="changePage('create-order'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'create-order' ? 'bg-green-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
+          <i class="fas fa-plus mr-2"></i>오더 입력
+        </button>
+        <button onclick="changePage('clients'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'clients' ? 'bg-purple-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
+          <i class="fas fa-building mr-2"></i>거래처 관리
+        </button>
+        <button onclick="changePage('codes'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'codes' ? 'bg-orange-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
+          <i class="fas fa-code mr-2"></i>코드 관리
+        </button>
+        <button onclick="changePage('todos'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-lg mb-2 font-semibold ${state.currentPage === 'todos' ? 'bg-red-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}">
+          <i class="fas fa-tasks mr-2"></i>할일
+        </button>
       </div>
     </div>
   `
@@ -2950,15 +2894,6 @@ async function handleExcelUpload(event) {
 
 function changePage(page) {
   state.currentPage = page
-  
-  // 열려있는 탭 목록에 추가 (중복 방지)
-  if (!state.openedTabs) {
-    state.openedTabs = ['orders']
-  }
-  if (!state.openedTabs.includes(page)) {
-    state.openedTabs.push(page)
-  }
-  
   if (page === 'create-order') {
     state.inputMode = 'text'  // 오더 입력 페이지 진입 시 텍스트 모드로 초기화
   }
@@ -2978,41 +2913,6 @@ function changePage(page) {
     }
   }
 }
-
-function closeTab(tabId) {
-  // 오더 관리 탭은 닫을 수 없음 (기본 탭)
-  if (tabId === 'orders') {
-    alert('오더 관리 탭은 닫을 수 없습니다.')
-    return
-  }
-  
-  // 열려있는 탭 목록에서 제거
-  state.openedTabs = state.openedTabs.filter(t => t !== tabId)
-  
-  // 현재 활성 탭이 닫히는 경우, 가장 오른쪽 탭으로 이동
-  if (state.currentPage === tabId) {
-    const lastTab = state.openedTabs[state.openedTabs.length - 1]
-    changePage(lastTab)
-  } else {
-    // 네비게이션만 다시 렌더링
-    render()
-  }
-}
-
-function toggleNewTabMenu() {
-  const menu = document.getElementById('newTabMenu')
-  if (menu) {
-    menu.classList.toggle('hidden')
-  }
-}
-
-// 메뉴 외부 클릭 시 닫기
-document.addEventListener('click', function(e) {
-  const menu = document.getElementById('newTabMenu')
-  if (menu && !menu.classList.contains('hidden') && !e.target.closest('.relative')) {
-    menu.classList.add('hidden')
-  }
-})
 
 function changeInputMode(mode) {
   state.inputMode = mode
