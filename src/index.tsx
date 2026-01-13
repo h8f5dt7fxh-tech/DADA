@@ -93,8 +93,8 @@ app.get('/api/orders', async (c) => {
     `
     
     const [billingsRes, paymentsRes] = await Promise.all([
-      env.DB.prepare(billingsQuery).bind(date).all(),
-      env.DB.prepare(paymentsQuery).bind(date).all()
+      env.DB.prepare(billingsQuery).bind(date || '').all(),
+      env.DB.prepare(paymentsQuery).bind(date || '').all()
     ])
     
     const billingTotals: any = {}
@@ -115,7 +115,7 @@ app.get('/api/orders', async (c) => {
       WHERE order_id IN (SELECT id FROM transport_orders WHERE strftime('%Y-%m', work_datetime) = ?)
       ORDER BY importance DESC, created_at DESC
     `
-    const remarksRes = await env.DB.prepare(remarksQuery).bind(date).all()
+    const remarksRes = await env.DB.prepare(remarksQuery).bind(date || '').all()
     
     const remarksMap: any = {}
     remarksRes.results.forEach((r: any) => {
