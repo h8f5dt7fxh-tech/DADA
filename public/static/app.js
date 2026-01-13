@@ -735,46 +735,32 @@ window.quickSearchShipper = async function(event) {
   
   searchTimeout = setTimeout(async () => {
     try {
-      // 모든 청구처-화주 조합 검색
-      const response = await axios.get('/api/billing-sales')
-      const billingSales = response.data
+      resultsDiv.innerHTML = '<div class="p-4 text-center"><i class="fas fa-spinner fa-spin text-gray-400"></i></div>'
+      resultsDiv.classList.remove('hidden')
       
-      // 화주명으로 필터링
-      const matches = []
-      for (const sales of billingSales) {
-        const shippersRes = await axios.get(`/api/billing-sales/${sales.id}/shippers`)
-        const shippers = shippersRes.data
-        
-        for (const shipper of shippers) {
-          if (shipper.shipper_name.toLowerCase().includes(query.toLowerCase())) {
-            matches.push({
-              billingCompany: sales.billing_company,
-              billingCompanyId: sales.id,
-              ...shipper
-            })
-          }
-        }
-      }
+      // 새로운 API 사용
+      const response = await axios.get(`/api/billing-shippers?search=${encodeURIComponent(query)}`)
+      const shippers = response.data
       
-      if (matches.length === 0) {
+      if (shippers.length === 0) {
         resultsDiv.innerHTML = '<div class="p-4 text-gray-500 text-sm">검색 결과가 없습니다</div>'
-        resultsDiv.classList.remove('hidden')
         return
       }
       
-      // 결과 표시
-      const html = matches.map(m => `
+      // 결과 표시 (최대 10개만)
+      const html = shippers.slice(0, 10).map(s => `
         <div class="p-3 hover:bg-gray-50 cursor-pointer border-b" 
-             onclick="showShipperQuick(${m.billingCompanyId}, ${m.id}, '${m.shipper_name.replace(/'/g, "\\'")}', '${m.billingCompany.replace(/'/g, "\\'")}')">
-          <div class="font-semibold text-sm">${m.shipper_name}</div>
-          <div class="text-xs text-gray-500">${m.billingCompany}</div>
+             onclick="showShipperDetails(${s.id}, '${s.shipper.replace(/'/g, "\\'")}', '${s.billing_company.replace(/'/g, "\\'")}')">
+          <div class="font-semibold text-sm">${s.shipper}</div>
+          <div class="text-xs text-gray-500">${s.billing_company}</div>
+          ${s.memo ? `<div class="text-xs text-gray-400">${s.memo}</div>` : ''}
         </div>
       `).join('')
       
       resultsDiv.innerHTML = html
-      resultsDiv.classList.remove('hidden')
     } catch (error) {
       console.error('검색 실패:', error)
+      resultsDiv.innerHTML = '<div class="p-4 text-red-500 text-sm">검색 중 오류가 발생했습니다</div>'
     }
   }, 300)
 }
@@ -790,54 +776,60 @@ document.addEventListener('click', (e) => {
 })
 
 // 화주 정보 빠른 보기
-window.showShipperQuick = async function(billingCompanyId, shipperId, shipperName, billingCompany) {
+window.showShipperDetails = async function(shipperId, shipperName, billingCompany) {
   // 검색창 닫기
   document.getElementById('quickSearchResults').classList.add('hidden')
   document.getElementById('quickShipperSearch').value = ''
   
-  try {
-    const response = await axios.get(`/api/billing-sales/${billingCompanyId}/shippers`)
-    const shipper = response.data.find(s => s.id === shipperId)
-    
-    if (!shipper) {
-      alert('화주 정보를 찾을 수 없습니다.')
-      return
-    }
-    
-    // 모달 생성
-    const modal = document.createElement('div')
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
-    modal.onclick = (e) => {
-      if (e.target === modal) modal.remove()
-    }
-    
-    const quotationHtml = shipper.quotation
-      ? shipper.quotation.split('\\n').map(line => {
-          line = line.trim()
-          if (!line) return '<br>'
-          
-          // 헤더 라인 (왕복, 편도 등)
-          if (line.includes('/') && (line.includes('왕복') || line.includes('편도'))) {
-            return `<div class="font-bold text-blue-600">${line}</div>`
-          }
-          // 가격 라인
-          else if (line.includes('원')) {
-            return `<div class="text-green-600 font-semibold ml-4">${line}</div>`
-          }
-          // 일반 텍스트
-          else {
-            return `<div class="text-gray-700 ml-2">${line}</div>`
-          }
-        }).join('')
-      : '<div class="text-gray-400">견적이 없습니다</div>'
-    
-    modal.innerHTML = `
-      <div class="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-        <div class="flex items-center justify-between mb-4 pb-3 border-b">
-          <div>
-            <h3 class="text-xl font-bold">${shipperName}</h3>
-            <p class="text-sm text-gray-500"><i class="fas fa-building mr-1"></i>${billingCompany}</p>
-          </div>
+  // 간단한 정보 모달 표시
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold">화주 정보</h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+      
+      <div class="space-y-3">
+        <div>
+          <div class="text-sm text-gray-500">화주명</div>
+          <div class="font-semibold text-lg">${shipperName}</div>
+        </div>
+        <div>
+          <div class="text-sm text-gray-500">청구처</div>
+          <div class="font-semibold">${billingCompany}</div>
+        </div>
+      </div>
+      
+      <div class="mt-6 flex justify-end space-x-2">
+        <button onclick="changePage('clients'); this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          거래처 관리로 이동
+        </button>
+        <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">
+          닫기
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+// 화주 정보 빠른 보기 (기존 함수 - 하위 호환성)
+window.showShipperQuick = async function(billingCompanyId, shipperId, shipperName, billingCompany) {
+  showShipperDetails(shipperId, shipperName, billingCompany)
+}
+
+// ============================================
           <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
             <i class="fas fa-times text-2xl"></i>
           </button>
@@ -1747,27 +1739,191 @@ function renderClientsManagementPage() {
   return `
     <div class="bg-white p-6 rounded-lg shadow">
       <h2 class="text-2xl font-bold mb-4">
-        <i class="fas fa-building mr-2"></i>거래처 관리 (청구처-영업담당자)
+        <i class="fas fa-building mr-2"></i>거래처 관리
       </h2>
-      <p class="text-gray-600 mb-4">청구처별 영업담당자를 관리합니다.</p>
       
-      <div class="mb-4 flex justify-between items-center">
-        <button onclick="showAddBillingSalesModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-          <i class="fas fa-plus mr-1"></i>청구처 추가
+      <!-- 탭 버튼 -->
+      <div class="flex space-x-2 mb-4 border-b">
+        <button onclick="switchClientTab('billing-sales')" 
+                id="tab-btn-billing-sales"
+                class="px-4 py-2 font-semibold border-b-2 border-blue-600 text-blue-600">
+          청구처-영업담당자
         </button>
-        <input type="text" id="billingSalesSearch" placeholder="검색..." 
-               oninput="filterBillingSales(this.value)" 
-               class="px-3 py-2 border rounded w-64">
+        <button onclick="switchClientTab('shippers')" 
+                id="tab-btn-shippers"
+                class="px-4 py-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+          화주 검색
+        </button>
       </div>
       
-      <div id="billingSalesTableContainer" class="overflow-auto">
-        <div class="text-center py-8">
-          <i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i>
-          <p class="text-gray-500 mt-2">로딩 중...</p>
+      <!-- 청구처-영업담당자 탭 -->
+      <div id="client-tab-billing-sales" class="client-tab-content">
+        <p class="text-gray-600 mb-4">청구처별 영업담당자를 관리합니다.</p>
+        
+        <div class="mb-4 flex justify-between items-center">
+          <button onclick="showAddBillingSalesModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            <i class="fas fa-plus mr-1"></i>청구처 추가
+          </button>
+          <input type="text" id="billingSalesSearch" placeholder="청구처 검색..." 
+                 oninput="filterBillingSales(this.value)" 
+                 class="px-3 py-2 border rounded w-64">
+        </div>
+        
+        <div id="billingSalesTableContainer" class="overflow-auto">
+          <div class="text-center py-8">
+            <i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i>
+            <p class="text-gray-500 mt-2">로딩 중...</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 화주 검색 탭 -->
+      <div id="client-tab-shippers" class="client-tab-content" style="display: none;">
+        <p class="text-gray-600 mb-4">청구처별 화주를 검색하고 관리합니다.</p>
+        
+        <div class="mb-4">
+          <input type="text" id="shipperSearchInput" placeholder="화주명 검색..." 
+                 oninput="searchShippers(this.value)" 
+                 class="px-3 py-2 border rounded w-full">
+        </div>
+        
+        <div id="shipperSearchResults" class="overflow-auto">
+          <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-search text-4xl mb-2"></i>
+            <p>화주명을 입력하여 검색하세요</p>
+          </div>
         </div>
       </div>
     </div>
   `
+}
+
+// 거래처 관리 탭 전환
+function switchClientTab(tabName) {
+  // 모든 탭 숨기기
+  document.querySelectorAll('.client-tab-content').forEach(tab => {
+    tab.style.display = 'none'
+  })
+  
+  // 모든 탭 버튼 비활성화
+  document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => {
+    btn.className = 'px-4 py-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800'
+  })
+  
+  // 선택된 탭 보이기
+  const selectedTab = document.getElementById(`client-tab-${tabName}`)
+  if (selectedTab) {
+    selectedTab.style.display = 'block'
+  }
+  
+  // 선택된 탭 버튼 활성화
+  const selectedBtn = document.getElementById(`tab-btn-${tabName}`)
+  if (selectedBtn) {
+    selectedBtn.className = 'px-4 py-2 font-semibold border-b-2 border-blue-600 text-blue-600'
+  }
+}
+
+// 화주 검색
+async function searchShippers(query) {
+  const resultsContainer = document.getElementById('shipperSearchResults')
+  
+  if (!query || query.trim() === '') {
+    resultsContainer.innerHTML = `
+      <div class="text-center py-8 text-gray-500">
+        <i class="fas fa-search text-4xl mb-2"></i>
+        <p>화주명을 입력하여 검색하세요</p>
+      </div>
+    `
+    return
+  }
+  
+  resultsContainer.innerHTML = `
+    <div class="text-center py-8">
+      <i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i>
+      <p class="text-gray-500 mt-2">검색 중...</p>
+    </div>
+  `
+  
+  try {
+    const response = await axios.get(`/api/billing-shippers?search=${encodeURIComponent(query)}`)
+    const shippers = response.data
+    
+    if (shippers.length === 0) {
+      resultsContainer.innerHTML = `
+        <div class="text-center py-8 text-gray-500">
+          <i class="fas fa-inbox text-4xl mb-2"></i>
+          <p>"${query}"에 대한 검색 결과가 없습니다</p>
+        </div>
+      `
+      return
+    }
+    
+    // 청구처별로 그룹핑
+    const groupedByBilling = {}
+    shippers.forEach(s => {
+      if (!groupedByBilling[s.billing_company]) {
+        groupedByBilling[s.billing_company] = []
+      }
+      groupedByBilling[s.billing_company].push(s)
+    })
+    
+    const html = `
+      <div class="space-y-4">
+        <div class="text-sm text-gray-600 mb-2">
+          <i class="fas fa-check-circle text-green-600"></i> 총 ${shippers.length}개의 화주가 ${Object.keys(groupedByBilling).length}개 청구처에서 발견되었습니다
+        </div>
+        ${Object.entries(groupedByBilling).map(([billingCompany, shipperList]) => `
+          <div class="border rounded-lg p-4 bg-gray-50">
+            <div class="font-bold text-lg mb-2 text-blue-800">
+              <i class="fas fa-building mr-2"></i>${billingCompany}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              ${shipperList.map(s => `
+                <div class="bg-white p-2 rounded border hover:shadow-md transition">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold">${s.shipper}</span>
+                    <button onclick="deleteShipper(${s.id}, '${s.shipper}')" 
+                            class="text-red-600 hover:text-red-800 text-sm">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  ${s.memo ? `<div class="text-xs text-gray-500 mt-1">${s.memo}</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `
+    
+    resultsContainer.innerHTML = html
+  } catch (error) {
+    console.error('화주 검색 실패:', error)
+    resultsContainer.innerHTML = `
+      <div class="text-center py-8 text-red-500">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>검색 중 오류가 발생했습니다</p>
+      </div>
+    `
+  }
+}
+
+// 화주 삭제
+async function deleteShipper(id, shipperName) {
+  if (!confirm(`"${shipperName}" 화주를 삭제하시겠습니까?`)) return
+  
+  try {
+    await axios.delete(`/api/billing-shippers/${id}`)
+    alert('삭제되었습니다.')
+    // 현재 검색어로 다시 검색
+    const searchInput = document.getElementById('shipperSearchInput')
+    if (searchInput) {
+      searchShippers(searchInput.value)
+    }
+  } catch (error) {
+    console.error('화주 삭제 실패:', error)
+    alert('삭제에 실패했습니다.')
+  }
 }
 
 // 코드 관리 함수들
