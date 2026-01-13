@@ -165,10 +165,8 @@ function parseOrderText(text, orderType) {
       order.shipping_line = line.split(':')[1]?.trim()
     }
     else if (line.startsWith('모선') || line.startsWith('모선 :')) {
-      const match = line.match(/:\s*(.+?)(?:\s*\/\s*(.+))?$/)
-      if (match) {
-        order.vessel_name = match[1]?.trim()
-      }
+      // 모선명과 항차 정보를 모두 포함 (예: HYUNDAI TOKYO / 0161W)
+      order.vessel_name = line.split(':')[1]?.trim()
     }
     else if (line.startsWith('수출국') || line.startsWith('수출국 :')) {
       order.export_country = line.split(':')[1]?.trim()
