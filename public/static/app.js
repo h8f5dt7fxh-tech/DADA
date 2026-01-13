@@ -828,73 +828,6 @@ window.showShipperQuick = async function(billingCompanyId, shipperId, shipperNam
 }
 
 // ============================================
-          <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
-            <i class="fas fa-times text-2xl"></i>
-          </button>
-        </div>
-        
-        <!-- 통합 정보 카드 -->
-        <div class="border rounded-lg overflow-hidden">
-          <!-- 헤더 -->
-          <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 flex items-center justify-between">
-            <h4 class="font-bold text-lg">
-              <i class="fas fa-file-invoice mr-2"></i>견적 및 비고
-            </h4>
-            <button onclick="editShipperQuotation(${billingCompanyId}, ${shipperId}, '${shipperName.replace(/'/g, "\\'")}'); this.closest('.fixed').remove()" 
-                    class="px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded text-sm">
-              <i class="fas fa-edit mr-1"></i>수정
-            </button>
-          </div>
-          
-          <!-- 견적 내용 -->
-          <div class="p-4 bg-gray-50">
-            <div class="mb-3">
-              <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">📋 견적 정보</span>
-            </div>
-            <div class="whitespace-pre-wrap text-sm mb-4 bg-white p-3 rounded border">
-              ${quotationHtml}
-            </div>
-            
-            <!-- 사진 미리보기 -->
-            ${shipper.photo_url ? `
-            <div class="mb-4">
-              <span class="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded mb-2">📷 첨부 사진</span>
-              <div class="bg-white p-3 rounded border">
-                <img src="${shipper.photo_url}" alt="견적 사진" 
-                     class="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity" 
-                     onclick="window.open('${shipper.photo_url}', '_blank')"
-                     title="클릭하여 크게 보기">
-                <p class="text-xs text-gray-500 mt-2 text-center">💡 클릭하여 크게 보기</p>
-              </div>
-            </div>
-            ` : ''}
-            
-            <!-- 비고 -->
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <span class="inline-block px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded">📝 비고</span>
-                <button onclick="editShipperMemo(${billingCompanyId}, ${shipperId}, '${shipperName.replace(/'/g, "\\'")}', '${(shipper.memo || '').replace(/'/g, "\\'")}'); this.closest('.fixed').remove()" 
-                        class="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-xs">
-                  <i class="fas fa-edit mr-1"></i>비고 수정
-                </button>
-              </div>
-              <div class="p-3 bg-yellow-50 rounded border text-sm whitespace-pre-wrap">
-                ${shipper.memo || '<span class="text-gray-400 italic">비고가 없습니다</span>'}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `
-    
-    document.body.appendChild(modal)
-  } catch (error) {
-    console.error('화주 정보 로드 실패:', error)
-    alert('화주 정보를 불러오는데 실패했습니다.')
-  }
-}
-
-// ============================================
 // UI 렌더링 함수
 // ============================================
 
@@ -2414,20 +2347,6 @@ async function updateDispatchCompany(id) {
   } catch (error) {
     console.error('협력업체 수정 실패:', error)
     alert('협력업체 수정에 실패했습니다.')
-  }
-}
-
-async function deleteDispatchCompany(id) {
-  if (!confirm('이 협력업체를 삭제하시겠습니까?')) return
-  
-  try {
-    await axios.delete(`/api/dispatch-companies/${id}`)
-    alert('협력업체가 삭제되었습니다.')
-    await fetchDispatchCompanies()
-    renderApp()
-  } catch (error) {
-    console.error('협력업체 삭제 실패:', error)
-    alert('협력업체 삭제에 실패했습니다.')
   }
 }
 
