@@ -1546,11 +1546,11 @@ app.get('/api/billing-shippers', async (c) => {
         bs.id,
         bs.shipper_name as shipper,
         bs.memo,
-        bc.company_name as billing_company,
+        bcs.billing_company as billing_company,
         bs.billing_company_id,
         'registered' as source
       FROM billing_shippers bs
-      LEFT JOIN billing_companies bc ON bs.billing_company_id = bc.id
+      LEFT JOIN billing_company_sales bcs ON bs.billing_company_id = bcs.id
       WHERE bs.shipper_name LIKE ?
       ORDER BY bs.shipper_name ASC
       LIMIT 30
