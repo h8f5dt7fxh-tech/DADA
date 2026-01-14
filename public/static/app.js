@@ -750,14 +750,23 @@ window.quickSearchShipper = async function(event) {
       }
       
       // 결과 표시 (최대 10개만)
-      const html = shippers.slice(0, 10).map(s => `
-        <div class="p-3 hover:bg-gray-50 cursor-pointer border-b" 
-             onclick="showShipperDetails(${s.id}, '${s.shipper.replace(/'/g, "\\'")}', '${s.billing_company.replace(/'/g, "\\'")}')">
-          <div class="font-semibold text-sm">${s.shipper}</div>
-          <div class="text-xs text-gray-500">${s.billing_company}</div>
-          ${s.memo ? `<div class="text-xs text-gray-400">${s.memo}</div>` : ''}
-        </div>
-      `).join('')
+      const html = shippers.slice(0, 10).map(s => {
+        const safeShipper = s.shipper.replace(/'/g, "\\'")
+        const safeBilling = (s.billing_company || '').replace(/'/g, "\\'")
+        const isOrder = s.source === 'order'
+        const badge = isOrder ? '<span class="text-xs bg-gray-200 px-1 rounded">오더</span>' : ''
+        
+        return `
+          <div class="p-3 hover:bg-gray-50 cursor-pointer border-b" 
+               onclick="showShipperDetails(${s.id || 'null'}, '${safeShipper}', '${safeBilling}')">
+            <div class="font-semibold text-sm flex items-center gap-2">
+              ${s.shipper} ${badge}
+            </div>
+            <div class="text-xs text-gray-500">${s.billing_company || '-'}</div>
+            ${s.memo ? `<div class="text-xs text-gray-400">${s.memo}</div>` : ''}
+          </div>
+        `
+      }).join('')
       
       resultsDiv.innerHTML = html
     } catch (error) {
@@ -788,6 +797,40 @@ window.showShipperDetails = async function(shipperId, shipperName, billingCompan
   modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
   modal.onclick = (e) => {
     if (e.target === modal) modal.remove()
+  }
+  
+  // shipperId가 null이면 (오더에서 온 화주) 간단 정보만 표시
+  if (!shipperId || shipperId === null || shipperId === 'null') {
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">화주 정보</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-600 hover:text-gray-800">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-3">
+          <div>
+            <div class="text-sm text-gray-500">화주명</div>
+            <div class="font-semibold text-lg">${shipperName}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500">청구처</div>
+            <div class="font-semibold">${billingCompany || '-'}</div>
+          </div>
+          <div class="bg-yellow-50 border border-yellow-200 p-3 rounded">
+            <div class="text-sm text-yellow-800">
+              <i class="fas fa-info-circle mr-1"></i>
+              오더에서 가져온 화주입니다.<br>
+              거래처 관리에서 등록하시면 더 많은 정보를 관리할 수 있습니다.
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    document.body.appendChild(modal)
+    return
   }
   
   modal.innerHTML = `

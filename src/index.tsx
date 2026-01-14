@@ -1530,7 +1530,7 @@ app.post('/api/billing-sales/:id/shippers', async (c) => {
   }
 })
 
-// 화주 검색 (전체 검색)
+// 화주 검색 (전체 검색 - billing_shippers + transport_orders 통합)
 app.get('/api/billing-shippers', async (c) => {
   const { env } = c
   const search = c.req.query('search') || ''
@@ -1540,21 +1540,63 @@ app.get('/api/billing-shippers', async (c) => {
       return c.json([])
     }
     
-    const { results } = await env.DB.prepare(`
+    // 1. billing_shippers 테이블에서 검색
+    const { results: registeredShippers } = await env.DB.prepare(`
       SELECT 
         bs.id,
         bs.shipper_name as shipper,
         bs.memo,
         bc.company_name as billing_company,
-        bs.billing_company_id
+        bs.billing_company_id,
+        'registered' as source
       FROM billing_shippers bs
       LEFT JOIN billing_companies bc ON bs.billing_company_id = bc.id
       WHERE bs.shipper_name LIKE ?
       ORDER BY bs.shipper_name ASC
-      LIMIT 50
+      LIMIT 30
     `).bind(`%${search}%`).all()
     
-    return c.json(results)
+    // 2. transport_orders 테이블에서 화주 검색 (중복 제거)
+    const { results: orderShippers } = await env.DB.prepare(`
+      SELECT DISTINCT
+        shipper,
+        billing_company,
+        'order' as source
+      FROM transport_orders
+      WHERE shipper LIKE ? AND shipper IS NOT NULL AND shipper != ''
+      LIMIT 30
+    `).bind(`%${search}%`).all()
+    
+    // 결과 합치기 (등록된 화주 우선, 중복 제거)
+    const shipperSet = new Set()
+    const combined = []
+    
+    // 등록된 화주 먼저 추가
+    for (const shipper of registeredShippers) {
+      const key = shipper.shipper.toLowerCase()
+      if (!shipperSet.has(key)) {
+        shipperSet.add(key)
+        combined.push(shipper)
+      }
+    }
+    
+    // 오더 화주 추가 (중복 제외)
+    for (const shipper of orderShippers) {
+      const key = shipper.shipper.toLowerCase()
+      if (!shipperSet.has(key)) {
+        shipperSet.add(key)
+        combined.push({
+          id: null,
+          shipper: shipper.shipper,
+          memo: null,
+          billing_company: shipper.billing_company,
+          billing_company_id: null,
+          source: 'order'
+        })
+      }
+    }
+    
+    return c.json(combined.slice(0, 50))
   } catch (error: any) {
     console.error('화주 검색 실패:', error)
     return c.json({ error: error.message }, 500)
