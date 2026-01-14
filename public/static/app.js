@@ -1294,7 +1294,6 @@ ${(order.remarks || []).length > 0 ? `\n📝 비고:\n${(order.remarks || []).ma
         ${textList}
       </div>
     </div>
-    </div>
     
     <!-- 숨겨진 카드 데이터 -->
     <div id="orderCardsData" style="display: none;">
@@ -4201,9 +4200,12 @@ function render() {
   }
   
   // 페이지별 초기화 (첫 렌더링 또는 페이지 전환 시)
-  if (isFirstRender || state.currentPage === 'orders') {
-    if (state.currentPage === 'orders' && !state.orders.length) {
+  if (state.currentPage === 'orders') {
+    // 오더 페이지: 항상 목록 렌더링
+    if (state.orders.length === 0) {
       fetchOrders()
+    } else {
+      renderOrderList()
     }
   }
   
