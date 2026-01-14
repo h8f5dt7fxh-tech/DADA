@@ -242,6 +242,10 @@ function parseOrderText(text, orderType) {
       // LCL 차량정보
       order.vehicle_info = line.split(':')[1]?.trim()
     }
+    else if (line.startsWith('차량 종류') || line.startsWith('차량종류') || line.startsWith('차량 종류 :') || line.startsWith('차량종류 :')) {
+      // LCL 차량 종류 (8톤, 1톤 등) → container_size에 저장
+      order.container_size = line.split(':')[1]?.trim()
+    }
     else if (line.startsWith('중량') || line.startsWith('중량 :')) {
       order.weight = line.split(':')[1]?.trim()
       if (order.weight && (order.weight.includes('계근') || order.weight.includes('공만차'))) {
