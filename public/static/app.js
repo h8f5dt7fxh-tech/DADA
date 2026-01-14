@@ -2891,8 +2891,7 @@ async function submitFormOrder() {
       
       // 오더 목록으로 이동
       state.currentPage = 'orders'
-      render()
-      fetchOrders()
+      changePage('orders')
     }
   } catch (error) {
     console.error('오더 생성 실패:', error)
@@ -2974,11 +2973,34 @@ function changePage(page) {
   if (page === 'create-order') {
     state.inputMode = 'text'  // 오더 입력 페이지 진입 시 텍스트 모드로 초기화
   }
-  render()
+  
+  // 모든 탭 숨기기
+  document.querySelectorAll('.tab-content').forEach(tab => {
+    tab.style.display = 'none'
+  })
+  
+  // 현재 탭만 보이기
+  const currentTab = document.getElementById(`tab-${page}`)
+  if (currentTab) {
+    currentTab.style.display = 'block'
+  }
+  
+  // 네비게이션 활성 상태만 업데이트
+  document.querySelectorAll('nav a').forEach(link => {
+    link.classList.remove('bg-blue-600', 'text-white')
+    link.classList.add('text-gray-600', 'hover:text-gray-800')
+  })
+  const activeLink = document.querySelector(`nav a[onclick*="${page}"]`)
+  if (activeLink) {
+    activeLink.classList.remove('text-gray-600', 'hover:text-gray-800')
+    activeLink.classList.add('bg-blue-600', 'text-white')
+  }
   
   // 페이지별 데이터 로드 (탭이 이미 로드되어 있으면 다시 로드하지 않음)
   if (page === 'orders' && state.orders.length === 0) {
     fetchOrders()
+  } else if (page === 'orders' && state.orders.length > 0) {
+    renderOrderList()  // 이미 데이터가 있으면 목록만 다시 렌더링
   } else if (page === 'todos') {
     fetchTodos()  // TODO는 항상 최신 데이터 로드
   } else if (page === 'create-order') {
@@ -3114,20 +3136,17 @@ function renderExcelInputMode() {
 
 function changeView(view) {
   state.currentView = view
-  render()
   fetchOrders()
 }
 
 function changeToDayView(date) {
   state.currentView = 'day'
   state.currentDate = date
-  render()
   fetchOrders()
 }
 
 function changeDate(date) {
   state.currentDate = date
-  render()
   fetchOrders()
 }
 
@@ -3146,7 +3165,6 @@ function navigatePeriod(direction) {
   }
   
   state.currentDate = newDate.format('YYYY-MM-DD')
-  render()
   fetchOrders()
 }
 
@@ -4182,11 +4200,8 @@ function render() {
     `
   }
   
-  // 네비게이션만 업데이트 (탭 활성화 상태)
-  const existingNav = document.querySelector('nav')
-  if (existingNav && !isFirstRender) {
-    existingNav.outerHTML = renderNavigation()
-  }
+  // 네비게이션 업데이트는 첫 렌더링에만 (중복 방지)
+  // 탭 전환 시에는 CSS만 변경
   
   // 모든 탭 숨기기
   document.querySelectorAll('.tab-content').forEach(tab => {
@@ -4277,7 +4292,7 @@ async function addTodoForOrder(orderId) {
 function goToOrderFromTodo(orderId) {
   // 오더 관리 페이지로 이동
   state.currentPage = 'orders'
-  render()
+  changePage('orders')
   
   // 오더 목록 로드 후 상세 보기
   fetchOrders().then(() => {
