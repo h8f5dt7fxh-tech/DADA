@@ -4179,9 +4179,9 @@ function render() {
   }
   
   // 네비게이션만 업데이트 (탭 활성화 상태)
-  const navContainer = document.querySelector('.max-w-7xl.mx-auto.px-4.py-6')
-  if (navContainer && navContainer.previousElementSibling) {
-    navContainer.previousElementSibling.outerHTML = renderNavigation()
+  const existingNav = document.querySelector('nav')
+  if (existingNav && !isFirstRender) {
+    existingNav.outerHTML = renderNavigation()
   }
   
   // 모든 탭 숨기기
