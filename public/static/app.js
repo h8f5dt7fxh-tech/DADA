@@ -1212,10 +1212,11 @@ ${order.unloading_location ? `하차지: ${order.unloading_location}` : ''}
 ${order.unloading_location_code ? `하차지 코드: ${order.unloading_location_code}` : ''}
 ${order.work_site ? `작업지: ${order.work_site}` : ''}
 ${order.work_site_code ? `작업지 코드: ${order.work_site_code}` : ''}
+${(order.order_type === 'container_export' || order.order_type === 'container_import') && (order.contact_person || order.contact_phone) ? `작업지 담당자: ${order.contact_person || '-'} / ${order.contact_phone || '-'}` : ''}
 
 배차업체: ${order.dispatch_company || '⚠️ 미지정'}
 차량정보: ${order.vehicle_info || '미배정'}
-${order.contact_person || order.contact_phone ? `담당자: ${order.contact_person || '-'} / ${order.contact_phone || '-'}` : ''}
+${(order.order_type !== 'container_export' && order.order_type !== 'container_import') && (order.contact_person || order.contact_phone) ? `담당자: ${order.contact_person || '-'} / ${order.contact_phone || '-'}` : ''}
 
 💰 청구: ${totalBilling.toLocaleString()}원 (${(order.billings || []).length}건)
 💰 하불: ${totalPayment.toLocaleString()}원 (${(order.payments || []).length}건)
