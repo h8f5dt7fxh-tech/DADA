@@ -3137,17 +3137,31 @@ function renderExcelInputMode() {
 function changeView(view) {
   state.currentView = view
   fetchOrders()
+  // 필터 UI 업데이트
+  updateFiltersUI()
 }
 
 function changeToDayView(date) {
   state.currentView = 'day'
   state.currentDate = date
   fetchOrders()
+  // 필터 UI 업데이트
+  updateFiltersUI()
 }
 
 function changeDate(date) {
   state.currentDate = date
   fetchOrders()
+  // 필터 UI 업데이트
+  updateFiltersUI()
+}
+
+// 필터 UI만 업데이트하는 함수
+function updateFiltersUI() {
+  const filterContainer = document.querySelector('.bg-white.p-3.md\\:p-4.rounded-lg.shadow.mb-4')
+  if (filterContainer) {
+    filterContainer.outerHTML = renderOrderFilters()
+  }
 }
 
 function navigatePeriod(direction) {
@@ -3166,6 +3180,8 @@ function navigatePeriod(direction) {
   
   state.currentDate = newDate.format('YYYY-MM-DD')
   fetchOrders()
+  // 필터 UI 업데이트
+  updateFiltersUI()
 }
 
 // 이전 함수명 호환성 유지

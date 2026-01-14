@@ -1530,6 +1530,37 @@ app.post('/api/billing-sales/:id/shippers', async (c) => {
   }
 })
 
+// 화주 검색 (전체 검색)
+app.get('/api/billing-shippers', async (c) => {
+  const { env } = c
+  const search = c.req.query('search') || ''
+  
+  try {
+    if (search.length < 2) {
+      return c.json([])
+    }
+    
+    const { results } = await env.DB.prepare(`
+      SELECT 
+        bs.id,
+        bs.shipper_name as shipper,
+        bs.memo,
+        bc.company_name as billing_company,
+        bs.billing_company_id
+      FROM billing_shippers bs
+      LEFT JOIN billing_companies bc ON bs.billing_company_id = bc.id
+      WHERE bs.shipper_name LIKE ?
+      ORDER BY bs.shipper_name ASC
+      LIMIT 50
+    `).bind(`%${search}%`).all()
+    
+    return c.json(results)
+  } catch (error: any) {
+    console.error('화주 검색 실패:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // 화주 수정
 app.put('/api/billing-shippers/:id', async (c) => {
   const { env } = c
