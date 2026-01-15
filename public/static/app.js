@@ -33,6 +33,21 @@ function formatTime(date) {
   return dayjs(date).format('HH:mm')
 }
 
+// 여러 위치를 줄바꿈으로 표시 (/ 구분자)
+function formatMultipleLocations(location) {
+  if (!location) return ''
+  
+  // / 로 분리된 여러 위치를 줄바꿈으로 표시
+  const locations = location.split('/').map(l => l.trim()).filter(l => l)
+  
+  if (locations.length === 1) {
+    return locations[0]
+  }
+  
+  // 여러 개면 번호를 붙여서 표시
+  return locations.map((loc, idx) => `${idx + 1}. ${loc}`).join('<br>')
+}
+
 function parseOrderText(text, orderType) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l)
   const order = { order_type: orderType, remarks: [] }
@@ -179,10 +194,10 @@ function parseOrderText(text, orderType) {
       }
     }
     else if (line.startsWith('상차지')) {
-      const match = line.match(/:\s*(.+?)(?:\s*\/\s*(.+))?$/)
-      if (match) {
-        order.loading_location = match[1]?.trim()
-        if (match[2]) order.unloading_location = match[2]?.trim()
+      // LCL 여러 상차지 지원: 전체 내용을 loading_location에 저장
+      const content = line.split(':')[1]?.trim()
+      if (content) {
+        order.loading_location = content  // "A / B / C" 전체 저장
       }
     }
     else if (line.startsWith('하차지') && !line.startsWith('상차지')) {
@@ -1064,7 +1079,7 @@ function renderOrderCard(order) {
       </div>
       ${order.order_type === 'lcl' ? `
         <div class="text-xs text-gray-600 mb-1">
-          <i class="fas fa-arrow-up mr-1 text-green-600"></i>상차: ${order.loading_location || '-'}
+          <i class="fas fa-arrow-up mr-1 text-green-600"></i>상차: ${formatMultipleLocations(order.loading_location) || '-'}
         </div>
         <div class="text-xs text-gray-600 mb-1">
           <i class="fas fa-arrow-down mr-1 text-blue-600"></i>하차: ${order.unloading_location || '-'}
@@ -1211,7 +1226,7 @@ function renderOrderList() {
     // LCL일 때는 작업지 대신 상하차지 강조
     const workSiteDisplay = order.order_type === 'lcl' 
       ? `<div class="text-sm">
-           <span class="text-blue-600 font-semibold">상차: ${order.loading_location || '미정'}</span><br>
+           <span class="text-blue-600 font-semibold">상차: ${formatMultipleLocations(order.loading_location) || '미정'}</span><br>
            <span class="text-green-600 font-semibold">하차: ${order.unloading_location || '미정'}</span>
          </div>`
       : `<div class="text-sm font-medium">${order.work_site || '-'}</div>`
