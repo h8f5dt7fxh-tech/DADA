@@ -50,7 +50,11 @@ function formatMultipleLocations(location) {
 
 function parseOrderText(text, orderType) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l)
-  const order = { order_type: orderType, remarks: [] }
+  const order = { 
+    order_type: orderType, 
+    remarks: [],
+    _original_text: text  // 원본 텍스트 보존
+  }
   
   // 컨테이너 사이즈 기반 타입 자동 판별을 위한 임시 변수
   let detectedContainerSize = null
@@ -1285,6 +1289,8 @@ ${(order.order_type !== 'container_export' && order.order_type !== 'container_im
 💰 수익: ${profit.toLocaleString()}원
 
 ${(order.remarks || []).length > 0 ? `\n📝 비고:\n${(order.remarks || []).map(r => `${'⭐'.repeat(r.importance)} ${r.content}`).join('\n')}` : ''}
+
+${order._original_text ? `\n\n📄 원본 입력 텍스트:\n${order._original_text}` : ''}
         </div>
         
         <!-- 수정 모드 (숨김) -->

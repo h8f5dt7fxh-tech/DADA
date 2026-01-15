@@ -247,7 +247,8 @@ app.post('/api/orders', async (c) => {
       loading_location, loading_location_code,
       unloading_location, unloading_location_code,
       dispatch_company, vehicle_info, status, weighing_required,
-      remarks, billings, payments
+      remarks, billings, payments,
+      _original_text
     } = body
     
     // ✅ 필수 필드 검증 (최소한으로 유지)
@@ -285,7 +286,7 @@ app.post('/api/orders', async (c) => {
         bl_number, do_status, customs_clearance, order_no,
         loading_location, loading_location_code,
         unloading_location, unloading_location_code,
-        dispatch_company, vehicle_info, status, weighing_required
+        dispatch_company, vehicle_info, status, weighing_required, original_text
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       order_type, billing_company, shipper, work_site || null, work_site_code || null,
@@ -296,7 +297,8 @@ app.post('/api/orders', async (c) => {
       bl_number || null, do_status || null, customs_clearance || null, order_no || null,
       loading_location || null, loading_location_code || null,
       unloading_location || null, unloading_location_code || null,
-      dispatch_company || null, vehicle_info || null, status || 'pending', weighing_required || 0
+      dispatch_company || null, vehicle_info || null, status || 'pending', weighing_required || 0,
+      _original_text || null
     ).run()
     
     const orderId = result.meta.last_row_id
