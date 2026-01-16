@@ -105,12 +105,24 @@ function parseOrderText(text, orderType) {
       }
     }
     else if (line.startsWith('컨테이너 넘버') || line.startsWith('컨테이너 넘버 /')) {
-      const match = line.match(/:\s*(.+?)(?:\s*\/\s*SIZE\s*:\s*(.+))?$/i)
-      if (match) {
-        order.container_number = match[1]?.trim()
-        if (match[2]) {
-          order.container_size = match[2]?.trim()
-          detectedContainerSize = order.container_size
+      // 패턴 1: 컨테이너 넘버 / SIZE : ABC123 / 40HC
+      // 패턴 2: 컨테이너 넘버 : ABC123 / DEF456 / 12345 (씰/TW 포함)
+      const sizeMatch = line.match(/:\s*(.+?)(?:\s*\/\s*SIZE\s*:\s*(.+))?$/i)
+      const parts = line.split(':')[1]?.trim().split('/').map(p => p.trim())
+      
+      if (sizeMatch && sizeMatch[2]) {
+        // SIZE 패턴이 있는 경우
+        order.container_number = sizeMatch[1]?.trim()
+        order.container_size = sizeMatch[2]?.trim()
+        detectedContainerSize = order.container_size
+      } else if (parts && parts.length >= 1) {
+        // 슬래시로 구분된 경우: 컨테이너 / 씰 / TW
+        order.container_number = parts[0]
+        if (parts.length >= 2 && parts[1] && !parts[1].toLowerCase().includes('size')) {
+          order.seal_number = parts[1]
+        }
+        if (parts.length >= 3) {
+          order.tw = parts[2]
         }
       }
     }
