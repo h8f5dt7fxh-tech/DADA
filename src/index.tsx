@@ -47,7 +47,7 @@ app.get('/api/orders', async (c) => {
     }
   }
   
-  // 검색 (2~3글자 검색)
+  // 검색 (2~3글자 검색) - 모든 주요 필드 검색
   if (search && search.length >= 2) {
     query += ` AND (
       shipper LIKE ? OR 
@@ -55,10 +55,18 @@ app.get('/api/orders', async (c) => {
       booking_number LIKE ? OR 
       bl_number LIKE ? OR 
       container_number LIKE ? OR
-      work_site LIKE ?
+      work_site LIKE ? OR
+      vehicle_info LIKE ? OR
+      dispatch_company LIKE ? OR
+      loading_location LIKE ? OR
+      unloading_location LIKE ? OR
+      shipping_line LIKE ? OR
+      order_no LIKE ? OR
+      contact_person LIKE ?
     )`
     const searchPattern = `%${search}%`
-    params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern)
+    params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, 
+                searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern)
   }
   
   query += ' ORDER BY work_datetime ASC'
