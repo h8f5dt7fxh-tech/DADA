@@ -353,7 +353,7 @@ app.post('/api/orders', async (c) => {
         loading_location, loading_location_code,
         unloading_location, unloading_location_code,
         dispatch_company, vehicle_info, status, weighing_required, original_text
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       order_type, billing_company, shipper, work_site || null, work_site_code || null,
       contact_person || null, contact_phone || null, finalWorkDatetime,
