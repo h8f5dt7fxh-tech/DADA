@@ -203,6 +203,64 @@ app.get('/api/orders', async (c) => {
   }
 })
 
+// ============================================
+// 오더 통합 검색 (반드시 /api/orders/:id 보다 앞에 위치)
+// ============================================
+
+app.get('/api/orders/search', async (c) => {
+  const { env } = c
+  const { q } = c.req.query()
+  
+  try {
+    // 검색어가 너무 짧으면 빈 배열 반환
+    if (!q || q.length < 2) {
+      return c.json([])
+    }
+    
+    // 모든 관련 필드에서 검색
+    const searchPattern = `%${q}%`
+    const query = `
+      SELECT * FROM transport_orders 
+      WHERE billing_company LIKE ? 
+         OR shipper LIKE ?
+         OR work_site LIKE ?
+         OR booking_number LIKE ?
+         OR bl_number LIKE ?
+         OR order_no LIKE ?
+         OR container_number LIKE ?
+         OR loading_location LIKE ?
+         OR unloading_location LIKE ?
+         OR dispatch_company LIKE ?
+         OR vehicle_info LIKE ?
+         OR contact_person LIKE ?
+         OR shipping_line LIKE ?
+         OR vessel_name LIKE ?
+         OR container_size LIKE ?
+         OR seal_number LIKE ?
+      ORDER BY work_datetime DESC
+      LIMIT 100
+    `
+    
+    const stmt = env.DB.prepare(query).bind(
+      searchPattern, searchPattern, searchPattern, searchPattern,
+      searchPattern, searchPattern, searchPattern, searchPattern,
+      searchPattern, searchPattern, searchPattern, searchPattern,
+      searchPattern, searchPattern, searchPattern, searchPattern
+    )
+    
+    const { results } = await stmt.all()
+    
+    return c.json(results)
+  } catch (error: any) {
+    console.error('오더 검색 실패:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// ============================================
+// 개별 오더 조회 (반드시 /api/orders/search 보다 뒤에 위치)
+// ============================================
+
 // 오더 상세 조회
 app.get('/api/orders/:id', async (c) => {
   const { env } = c

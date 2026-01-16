@@ -925,14 +925,21 @@ function renderNavigation() {
               </button>
             </div>
             
-            <!-- 화주 빠른 검색 -->
-            <div class="ml-auto relative">
-              <input type="text" 
-                     id="quickShipperSearch"
-                     placeholder="화주 검색..."
-                     class="px-4 py-2 border rounded-lg text-sm w-64 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                     onkeyup="quickSearchShipper(event)">
-              <div id="quickSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-96 overflow-y-auto hidden z-50"></div>
+            <!-- 통합 검색 버튼 -->
+            <div class="ml-auto flex items-center space-x-3">
+              <button onclick="showGlobalSearch()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-md">
+                <i class="fas fa-search mr-2"></i>오더 검색
+              </button>
+              
+              <!-- 화주 빠른 검색 -->
+              <div class="relative">
+                <input type="text" 
+                       id="quickShipperSearch"
+                       placeholder="화주 검색..."
+                       class="px-4 py-2 border rounded-lg text-sm w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                       onkeyup="quickSearchShipper(event)">
+                <div id="quickSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-96 overflow-y-auto hidden z-50"></div>
+              </div>
             </div>
           </div>
           
@@ -5965,6 +5972,227 @@ window.viewPhotoModal = function(photoUrl) {
   `
   
   document.body.appendChild(modal)
+}
+
+// ============================================
+// 오더 통합 검색
+// ============================================
+
+let globalSearchResults = []
+
+function showGlobalSearch() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-4 overflow-y-auto'
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove()
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg w-full max-w-4xl my-8" onclick="event.stopPropagation()">
+      <!-- 헤더 -->
+      <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-2xl font-bold">
+            <i class="fas fa-search mr-2"></i>오더 통합 검색
+          </h2>
+          <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200 text-2xl">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <!-- 검색 입력 -->
+        <div class="relative">
+          <input type="text" 
+                 id="globalSearchInput"
+                 placeholder="2~3글자만 입력해도 검색됩니다 (청구처, 화주, BKG, BL, 컨테이너번호, 상하차지, 배차업체, 차량번호, 담당자...)"
+                 class="w-full px-4 py-3 pr-12 rounded-lg text-gray-900 text-lg focus:outline-none focus:ring-4 focus:ring-blue-300"
+                 onkeyup="performGlobalSearch(event)"
+                 autofocus>
+          <div class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+            <i class="fas fa-search text-xl"></i>
+          </div>
+        </div>
+        
+        <!-- 검색 팁 -->
+        <div class="mt-3 text-sm text-blue-100">
+          <i class="fas fa-info-circle mr-1"></i>
+          팁: "현대", "부산", "CFS", "디티씨" 등 짧은 키워드로 빠르게 검색하세요
+        </div>
+      </div>
+      
+      <!-- 검색 결과 -->
+      <div id="globalSearchResults" class="p-6 max-h-[600px] overflow-y-auto">
+        <div class="text-center text-gray-400 py-12">
+          <i class="fas fa-search text-6xl mb-4"></i>
+          <p class="text-lg">검색어를 입력하세요</p>
+          <p class="text-sm mt-2">2~3글자만 입력해도 관련 오더를 모두 찾을 수 있습니다</p>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  // 입력 필드에 포커스
+  setTimeout(() => {
+    document.getElementById('globalSearchInput').focus()
+  }, 100)
+}
+
+async function performGlobalSearch(event) {
+  const searchTerm = event.target.value.trim()
+  const resultsDiv = document.getElementById('globalSearchResults')
+  
+  // 검색어가 너무 짧으면 무시
+  if (searchTerm.length < 2) {
+    resultsDiv.innerHTML = `
+      <div class="text-center text-gray-400 py-12">
+        <i class="fas fa-search text-6xl mb-4"></i>
+        <p class="text-lg">검색어를 입력하세요</p>
+        <p class="text-sm mt-2">최소 2글자 이상 입력해주세요</p>
+      </div>
+    `
+    return
+  }
+  
+  // 로딩 표시
+  resultsDiv.innerHTML = `
+    <div class="text-center text-gray-400 py-12">
+      <i class="fas fa-spinner fa-spin text-6xl mb-4"></i>
+      <p class="text-lg">검색 중...</p>
+    </div>
+  `
+  
+  try {
+    // 백엔드 API 호출
+    const response = await axios.get('/api/orders/search', {
+      params: { q: searchTerm }
+    })
+    
+    globalSearchResults = response.data
+    
+    if (globalSearchResults.length === 0) {
+      resultsDiv.innerHTML = `
+        <div class="text-center text-gray-400 py-12">
+          <i class="fas fa-inbox text-6xl mb-4"></i>
+          <p class="text-lg">검색 결과가 없습니다</p>
+          <p class="text-sm mt-2">"${searchTerm}"와(과) 일치하는 오더를 찾을 수 없습니다</p>
+        </div>
+      `
+      return
+    }
+    
+    // 결과 표시
+    resultsDiv.innerHTML = `
+      <div class="mb-4 flex justify-between items-center">
+        <h3 class="text-lg font-bold text-gray-700">
+          <i class="fas fa-check-circle text-green-600 mr-2"></i>
+          검색 결과: <span class="text-blue-600">${globalSearchResults.length}건</span>
+        </h3>
+        <div class="text-sm text-gray-500">
+          검색어: "${searchTerm}"
+        </div>
+      </div>
+      
+      <div class="space-y-3">
+        ${globalSearchResults.map(order => renderGlobalSearchResult(order, searchTerm)).join('')}
+      </div>
+    `
+  } catch (error) {
+    console.error('글로벌 검색 실패:', error)
+    resultsDiv.innerHTML = `
+      <div class="text-center text-red-400 py-12">
+        <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
+        <p class="text-lg">검색 실패</p>
+        <p class="text-sm mt-2">${error.message}</p>
+      </div>
+    `
+  }
+}
+
+function renderGlobalSearchResult(order, searchTerm) {
+  const typeLabels = {
+    'container_export': '수출',
+    'container_import': '수입',
+    'lcl': 'LCL',
+    'bulk': '벌크'
+  }
+  
+  const typeColors = {
+    'container_export': 'bg-blue-100 text-blue-800',
+    'container_import': 'bg-green-100 text-green-800',
+    'lcl': 'bg-purple-100 text-purple-800',
+    'bulk': 'bg-orange-100 text-orange-800'
+  }
+  
+  // 일치하는 필드 찾기
+  const matchedFields = []
+  const termLower = searchTerm.toLowerCase()
+  
+  if (order.billing_company?.toLowerCase().includes(termLower)) matchedFields.push(`청구처: ${order.billing_company}`)
+  if (order.shipper?.toLowerCase().includes(termLower)) matchedFields.push(`화주: ${order.shipper}`)
+  if (order.work_site?.toLowerCase().includes(termLower)) matchedFields.push(`작업지: ${order.work_site}`)
+  if (order.booking_number?.toLowerCase().includes(termLower)) matchedFields.push(`BKG: ${order.booking_number}`)
+  if (order.bl_number?.toLowerCase().includes(termLower)) matchedFields.push(`BL: ${order.bl_number}`)
+  if (order.order_no?.toLowerCase().includes(termLower)) matchedFields.push(`오더번호: ${order.order_no}`)
+  if (order.container_number?.toLowerCase().includes(termLower)) matchedFields.push(`컨테이너: ${order.container_number}`)
+  if (order.loading_location?.toLowerCase().includes(termLower)) matchedFields.push(`상차지: ${order.loading_location}`)
+  if (order.unloading_location?.toLowerCase().includes(termLower)) matchedFields.push(`하차지: ${order.unloading_location}`)
+  if (order.dispatch_company?.toLowerCase().includes(termLower)) matchedFields.push(`배차: ${order.dispatch_company}`)
+  if (order.vehicle_info?.toLowerCase().includes(termLower)) matchedFields.push(`차량: ${order.vehicle_info}`)
+  if (order.contact_person?.toLowerCase().includes(termLower)) matchedFields.push(`담당자: ${order.contact_person}`)
+  if (order.shipping_line?.toLowerCase().includes(termLower)) matchedFields.push(`선사: ${order.shipping_line}`)
+  if (order.vessel_name?.toLowerCase().includes(termLower)) matchedFields.push(`모선: ${order.vessel_name}`)
+  
+  return `
+    <div class="border rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer bg-white" 
+         onclick="openOrderFromGlobalSearch(${order.id})">
+      <div class="flex items-start justify-between mb-2">
+        <div class="flex items-center space-x-2">
+          <span class="px-3 py-1 rounded-full text-sm font-semibold ${typeColors[order.order_type]}">
+            ${typeLabels[order.order_type]}
+          </span>
+          <span class="text-gray-500 text-sm">#${order.id}</span>
+          <span class="text-gray-600 font-medium">${formatDate(order.work_datetime)}</span>
+        </div>
+        <button class="text-blue-600 hover:text-blue-800">
+          <i class="fas fa-external-link-alt"></i>
+        </button>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+        <div><span class="text-gray-500">청구처:</span> <span class="font-medium">${order.billing_company}</span></div>
+        <div><span class="text-gray-500">화주:</span> <span class="font-medium">${order.shipper}</span></div>
+      </div>
+      
+      ${matchedFields.length > 0 ? `
+        <div class="bg-yellow-50 border border-yellow-200 rounded p-2 text-sm">
+          <div class="text-yellow-800 font-semibold mb-1">
+            <i class="fas fa-star mr-1"></i>일치하는 정보:
+          </div>
+          <div class="text-gray-700 space-y-1">
+            ${matchedFields.slice(0, 3).map(field => `
+              <div class="truncate">• ${field}</div>
+            `).join('')}
+            ${matchedFields.length > 3 ? `<div class="text-gray-500">...외 ${matchedFields.length - 3}개</div>` : ''}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `
+}
+
+function openOrderFromGlobalSearch(orderId) {
+  // 모달 닫기
+  document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
+  
+  // 오더 관리 페이지로 이동
+  changePage('orders')
+  
+  // 오더 상세 모달 열기
+  setTimeout(() => {
+    showOrderDetailModal(orderId)
+  }, 300)
 }
 
 // ============================================
