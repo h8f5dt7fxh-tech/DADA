@@ -1270,7 +1270,7 @@ function renderOrderList() {
         
         <!-- 메모장 스타일 내용 -->
         <div id="view-mode-${order.id}" class="space-y-2 whitespace-pre-wrap">
-청구처: ${order.billing_company}
+${order._original_text ? `📄 원본 입력 내용:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${order._original_text}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` : ''}청구처: ${order.billing_company}
 화주: ${order.shipper}
 작업일시: ${formatDate(order.work_datetime)}
 
@@ -1308,8 +1308,6 @@ ${(order.order_type !== 'container_export' && order.order_type !== 'container_im
 💰 수익: ${profit.toLocaleString()}원
 
 ${(order.remarks || []).length > 0 ? `\n📝 비고:\n${(order.remarks || []).map(r => `${'⭐'.repeat(r.importance)} ${r.content}`).join('\n')}` : ''}
-
-${order._original_text ? `\n\n📄 원본 입력 텍스트:\n${order._original_text}` : ''}
         </div>
         
         <!-- 수정 모드 (숨김) -->
