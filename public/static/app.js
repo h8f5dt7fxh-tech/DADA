@@ -1427,7 +1427,14 @@ function toggleEditMode(orderId) {
     btnText.textContent = '수정'
   } else {
     // 보기 모드 → 수정 모드
-    textarea.value = viewMode.textContent.trim()
+    // 원본 텍스트만 가져오기 (state.orders에서 찾기)
+    const order = state.orders.find(o => o.id === orderId)
+    if (order && order.original_text) {
+      textarea.value = order.original_text
+    } else {
+      // 원본 텍스트가 없으면 전체 내용 사용
+      textarea.value = viewMode.textContent.trim()
+    }
     viewMode.classList.add('hidden')
     editMode.classList.remove('hidden')
     btnText.textContent = '취소'
